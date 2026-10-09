@@ -18,6 +18,7 @@ import com.nexusops.shared.web.Paging;
 import com.nexusops.tenancy.TenantDirectory;
 import java.time.Instant;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -107,6 +108,13 @@ public class TaskService {
         Page<Task> result = tasks.findAll(spec, Paging.of(page, size, sort));
         List<TaskView> views = views(result.getContent());
         return new PageResponse<>(views, result.getNumber(), result.getSize(), result.getTotalElements());
+    }
+
+    /** Status of each task id that exists in this tenant (HRMS onboarding progress). No permission check: a module API. */
+    @Transactional(readOnly = true)
+    public Map<UUID, TaskStatus> statuses(Collection<UUID> ids) {
+        TenantContext.requireTenantId();
+        return tasks.findAllById(ids).stream().collect(Collectors.toMap(Task::getId, Task::getStatus));
     }
 
     @Transactional

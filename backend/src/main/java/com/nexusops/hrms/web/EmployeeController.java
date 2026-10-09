@@ -6,10 +6,12 @@ import com.nexusops.hrms.EmployeeSummary;
 import com.nexusops.hrms.EmployeeView;
 import com.nexusops.hrms.EmploymentStatus;
 import com.nexusops.hrms.EndEmployment;
+import com.nexusops.hrms.OnboardingService;
 import com.nexusops.hrms.SkillGapView;
 import com.nexusops.hrms.web.HrDtos.EmployeeRequest;
 import com.nexusops.hrms.web.HrDtos.EndRequest;
 import com.nexusops.hrms.web.HrDtos.SkillsRequest;
+import com.nexusops.hrms.web.HrDtos.StartOnboardingRequest;
 import com.nexusops.hrms.web.HrDtos.VersionRequest;
 import com.nexusops.shared.web.PageResponse;
 import java.util.UUID;
@@ -30,9 +32,11 @@ import org.springframework.web.bind.annotation.RestController;
 class EmployeeController {
 
     private final EmployeeService employees;
+    private final OnboardingService onboarding;
 
-    EmployeeController(EmployeeService employees) {
+    EmployeeController(EmployeeService employees, OnboardingService onboarding) {
         this.employees = employees;
+        this.onboarding = onboarding;
     }
 
     @GetMapping
@@ -86,5 +90,11 @@ class EmployeeController {
     @PreAuthorize("hasAuthority('hr.employee.update')")
     EmployeeView skills(@PathVariable UUID id, @RequestBody SkillsRequest request) {
         return employees.setSkills(id, request.skills(), request.version());
+    }
+
+    @PostMapping("/{id}/onboarding")
+    @PreAuthorize("hasAuthority('hr.employee.update')")
+    EmployeeView startOnboarding(@PathVariable UUID id, @RequestBody StartOnboardingRequest request) {
+        return onboarding.start(id, request.templateId());
     }
 }

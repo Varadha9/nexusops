@@ -7,6 +7,8 @@ import com.nexusops.hrms.EmployeeUpdate;
 import com.nexusops.hrms.EmploymentType;
 import com.nexusops.hrms.JobRoleCommand;
 import com.nexusops.hrms.NewPerson;
+import com.nexusops.hrms.OnboardingItemCommand;
+import com.nexusops.hrms.OnboardingTemplateCommand;
 import com.nexusops.hrms.RequiredSkill;
 import java.time.LocalDate;
 import java.util.List;
@@ -51,4 +53,12 @@ final class HrDtos {
     record EndRequest(LocalDate endDate, String reason, Long version) {}
 
     record SkillsRequest(List<EmployeeSkillCommand> skills, Long version) {}
+
+    record OnboardingTemplateRequest(String name, List<OnboardingItemCommand> items, Long version) {
+        OnboardingTemplateCommand command() {
+            return new OnboardingTemplateCommand(name, items);
+        }
+    }
+
+    record StartOnboardingRequest(UUID templateId) {}
 }
