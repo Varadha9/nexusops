@@ -3,6 +3,7 @@ import { PERMISSIONS, RequirePermission } from '@/features/auth/permissions'
 import { EmployeeDetailPage } from './EmployeeDetailPage'
 import { EmployeesPage } from './EmployeesPage'
 import { HrIndex } from './HrIndex'
+import { LeavePage } from './LeavePage'
 
 /** /app/hrms/* children (Tasks 10–11 add theirs). */
 export const hrmsChildren: RouteObject[] = [
@@ -12,6 +13,14 @@ export const hrmsChildren: RouteObject[] = [
     element: (
       <RequirePermission anyOf={[PERMISSIONS.hrEmployeeRead]}>
         <EmployeesPage />
+      </RequirePermission>
+    ),
+  },
+  {
+    path: 'leave',
+    element: (
+      <RequirePermission anyOf={[PERMISSIONS.hrLeaveApprove]}>
+        <LeavePage />
       </RequirePermission>
     ),
   },

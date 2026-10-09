@@ -18,6 +18,7 @@ import { EmployeeFormDialog, employeeKey } from './EmployeeFormDialog'
 import { EndEmploymentDialog } from './EndEmploymentDialog'
 import { invalidateHr } from './invalidation'
 import { EMPLOYMENT_STATUS_LABELS, EMPLOYMENT_TYPE_LABELS } from './labels'
+import { LeaveCard } from './LeaveCard'
 import { OnboardingCard } from './OnboardingCard'
 import { SkillGapCard } from './SkillGapCard'
 
@@ -187,7 +188,7 @@ function EmployeeDetail({ employeeId }: { employeeId: string }) {
         <EmploymentCard employee={e} />
         <SkillGapCard employee={e} />
         <OnboardingCard employee={e} />
-        {/* leave */}
+        <LeaveCard employee={e} />
         {/* training */}
       </div>
       <div id="tasks">
