@@ -33,4 +33,10 @@ public final class TestHr {
         return Api.id(owner.post("/api/v1/hr/job-roles", "{\"title\":\"" + title + "\",\"departmentId\":" + department
                 + ",\"requiredSkills\":" + skills + "}").andExpect(status().isCreated()));
     }
+
+    public static UUID hire(Api owner, String firstName, String lastName, String number) throws Exception {
+        return Api.id(owner.post("/api/v1/hr/employees", "{\"person\":{\"firstName\":\"" + firstName
+                + "\",\"lastName\":\"" + lastName + "\"},\"employeeNumber\":\"" + number
+                + "\",\"startDate\":\"2026-01-05\"}").andExpect(status().isCreated()));
+    }
 }

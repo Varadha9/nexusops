@@ -4,6 +4,7 @@ import com.nexusops.audit.AuditEntry;
 import com.nexusops.audit.AuditService;
 import com.nexusops.hrms.domain.Department;
 import com.nexusops.hrms.domain.DepartmentRepository;
+import com.nexusops.hrms.domain.EmployeeRepository;
 import com.nexusops.shared.Ids;
 import com.nexusops.shared.TenantContext;
 import com.nexusops.shared.Text;
@@ -26,14 +27,20 @@ public class DepartmentService {
 
     static final String UNKNOWN = "Choose a department in this workspace.";
     static final String NAME_TAKEN = "Another department already uses this name.";
+    static final String EMPLOYEES_LEFT = "Move this department's employees first.";
     private static final String LOCK = "hr-departments";
 
     private final DepartmentRepository departments;
+    private final EmployeeRepository employees;
+    private final HrClock clock;
     private final TenantLocks locks;
     private final AuditService audit;
 
-    DepartmentService(DepartmentRepository departments, TenantLocks locks, AuditService audit) {
+    DepartmentService(DepartmentRepository departments, EmployeeRepository employees, HrClock clock, TenantLocks locks,
+            AuditService audit) {
         this.departments = departments;
+        this.employees = employees;
+        this.clock = clock;
         this.locks = locks;
         this.audit = audit;
     }
@@ -84,6 +91,9 @@ public class DepartmentService {
     public DepartmentView archive(UUID id) {
         Department department = find(id);
         if (!department.isArchived()) {
+            if (employees.anyCurrentIn(id, clock.today())) {
+                throw ApiProblem.conflict(EMPLOYEES_LEFT);
+            }
             department.archive(Instant.now());
             departments.flush();
             audit.record(AuditEntry.of("DepartmentArchived", "Department", id).withBefore(snapshot(department)));
