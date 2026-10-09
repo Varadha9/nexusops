@@ -1,5 +1,6 @@
 package com.nexusops.hrms.web;
 
+import com.nexusops.hrms.CourseCommand;
 import com.nexusops.hrms.DepartmentCommand;
 import com.nexusops.hrms.EmployeeCommand;
 import com.nexusops.hrms.EmployeeSkillCommand;
@@ -12,6 +13,8 @@ import com.nexusops.hrms.NewPerson;
 import com.nexusops.hrms.OnboardingItemCommand;
 import com.nexusops.hrms.OnboardingTemplateCommand;
 import com.nexusops.hrms.RequiredSkill;
+import com.nexusops.hrms.TaughtSkill;
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
@@ -79,4 +82,15 @@ final class HrDtos {
     }
 
     record DecisionRequest(String note, Long version) {}
+
+    record CourseRequest(String title, String description, BigDecimal durationHours, String link,
+            List<TaughtSkill> skills, Long version) {
+        CourseCommand command() {
+            return new CourseCommand(title, description, durationHours, link, skills);
+        }
+    }
+
+    record AssignTrainingRequest(UUID courseId, UUID employeeId, LocalDate dueOn) {}
+
+    record CompleteRequest(String note, Long version) {}
 }
