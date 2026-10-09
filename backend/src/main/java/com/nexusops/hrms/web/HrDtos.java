@@ -12,6 +12,7 @@ import com.nexusops.hrms.LeaveTypeCommand;
 import com.nexusops.hrms.NewPerson;
 import com.nexusops.hrms.OnboardingItemCommand;
 import com.nexusops.hrms.OnboardingTemplateCommand;
+import com.nexusops.hrms.PolicyCommand;
 import com.nexusops.hrms.RequiredSkill;
 import com.nexusops.hrms.TaughtSkill;
 import java.math.BigDecimal;
@@ -93,4 +94,10 @@ final class HrDtos {
     record AssignTrainingRequest(UUID courseId, UUID employeeId, LocalDate dueOn) {}
 
     record CompleteRequest(String note, Long version) {}
+
+    record PolicyRequest(String title, String body, Long version) {
+        PolicyCommand command() {
+            return new PolicyCommand(title, body);
+        }
+    }
 }

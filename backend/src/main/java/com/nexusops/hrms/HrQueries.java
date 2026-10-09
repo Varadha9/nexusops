@@ -75,4 +75,22 @@ class HrQueries {
                 + "and (lower(p.name) like :pattern escape '\\' or e.number_key like :pattern escape '\\') "
                 + "order by lower(p.name), e.id limit :limit", params, UUID.class);
     }
+
+    Page policyPage(String rawQ, List<PolicyStatus> statuses, int limit, long offset) {
+        MapSqlParameterSource params = new MapSqlParameterSource("tenant", TenantContext.requireTenantId())
+                .addValue("statuses", statuses.stream().map(Enum::name).toList());
+        StringBuilder where = new StringBuilder("p.tenant_id = :tenant and p.status in (:statuses)");
+        String q = Text.optional(rawQ, 200, "q");
+        String order = "p.updated_at desc, p.id desc";
+        if (q != null) {
+            where.append(" and p.search @@ websearch_to_tsquery('simple', :q)");
+            params.addValue("q", q);
+            order = "ts_rank(p.search, websearch_to_tsquery('simple', :q)) desc, " + order;
+        }
+        Long total = jdbc.queryForObject("select count(*) from hr_policies p where " + where, params, Long.class);
+        params.addValue("limit", limit).addValue("offset", offset);
+        List<UUID> ids = jdbc.queryForList("select p.id from hr_policies p where " + where + " order by " + order
+                + " limit :limit offset :offset", params, UUID.class);
+        return new Page(ids, total == null ? 0 : total);
+    }
 }
