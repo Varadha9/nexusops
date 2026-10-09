@@ -116,7 +116,7 @@ class HrQueries {
                 .addValue("today", today);
         return jdbc.queryForList("select e.department_id as department_id, count(*) as n from employees e "
                 + "where e.tenant_id = :tenant and " + ACTIVE + " group by e.department_id "
-                + "order by e.department_id is null, count(*) desc", p);
+                + "order by e.department_id is null, count(*) desc, e.department_id", p);
     }
 
     /** Skills most often below their job role's minimum among active employees (D8, D19). */
@@ -135,15 +135,17 @@ class HrQueries {
                 """.formatted(ACTIVE), p);
     }
 
-    /** Onboardings with at least one task not done yet. */
-    long onboardingInProgress() {
-        MapSqlParameterSource p = new MapSqlParameterSource("tenant", TenantContext.requireTenantId());
+    /** Onboardings of employees who haven't left, with at least one task not done yet. */
+    long onboardingInProgress(LocalDate today) {
+        MapSqlParameterSource p = new MapSqlParameterSource("tenant", TenantContext.requireTenantId())
+                .addValue("today", today);
         Long n = jdbc.queryForObject("""
                 select count(distinct o.id) from employee_onboardings o
+                join employees e on e.tenant_id = o.tenant_id and e.id = o.employee_id
                 join employee_onboarding_tasks l on l.tenant_id = o.tenant_id and l.onboarding_id = o.id
                 join tasks t on t.id = l.task_id and t.tenant_id = :tenant
-                where o.tenant_id = :tenant and t.status not in ('DONE', 'CANCELLED')
-                """, p, Long.class);
+                where o.tenant_id = :tenant and not %s and t.status not in ('DONE', 'CANCELLED')
+                """.formatted(LEFT), p, Long.class);
         return n == null ? 0 : n;
     }
 }

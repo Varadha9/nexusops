@@ -54,7 +54,7 @@ class HrModuleGateIT extends IntegrationTestSupport {
                 }
             }
         });
-        assertThat(checked).as("HRMS routes were found").hasSizeGreaterThanOrEqualTo(45);
+        assertThat(checked).as("HRMS routes were found").hasSizeGreaterThanOrEqualTo(65);
         assertThat(violations).isEmpty();
     }
 

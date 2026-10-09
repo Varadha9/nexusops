@@ -23,7 +23,7 @@ person and marks employees with an EMPLOYEE role (Phase 4). AI must never decide
 4. **Leave is counted when requested**: working days (Mon–Fri minus the workspace's holidays) are computed by a pure
    function and stored on the request, so editing holidays later doesn't change decided requests. Balances are sums per
    calendar year: allowance + append-only adjustments − approved − pending. Approvers can't decide their own requests.
-   Ending employment cancels only leave and training after the last day.
+   Ending employment cancels leave starting after the last day and all open trainings.
 5. **Self-service** routes act only on the employee linked to the caller.
 6. Every HRMS permission belongs to module HRMS. Policies are a full-text-searchable library (the deterministic
    baseline for a later AI policy assistant).

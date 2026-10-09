@@ -46,7 +46,7 @@ public class HrDashboardService {
                         ((Number) r.get("n")).longValue())).toList(),
                 c.upcoming(), c.joiners(), c.leavers(),
                 leave.away(today, today), leave.away(today.plusDays(1), today.plusDays(7)),
-                leave.pendingCount(), training.overdueCount(), queries.onboardingInProgress(),
+                leave.pendingCount(), training.overdueCount(), queries.onboardingInProgress(today),
                 gaps.stream().map(r -> new HrDashboardView.SkillGapCount(
                         SkillService.ref(skillNames.get((UUID) r.get("skill_id"))), ((Number) r.get("n")).longValue()))
                         .toList());

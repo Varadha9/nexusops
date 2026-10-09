@@ -123,9 +123,10 @@ class HrRlsIT extends IntegrationTestSupport {
             case "skills" -> as.update("insert into skills (id, tenant_id, name, name_key, created_at, updated_at) "
                     + "values (?, ?, ?, ?, ?, ?)", id, tenantB, "Skill " + n, "skill " + n, now, now);
             case "employees" -> {
+                // prerequisite as tenant B, so only the employees INSERT runs through the tested connection
                 UUID newPerson = UUID.randomUUID();
-                as.update("insert into parties (id, tenant_id, kind, name, name_key, first_name, last_name, created_at, "
-                        + "updated_at) values (?, ?, 'PERSON', ?, ?, 'Beta', ?, ?, ?)", newPerson, tenantB,
+                OwnerJdbc.ownerAs(tenantB).update("insert into parties (id, tenant_id, kind, name, name_key, first_name, "
+                        + "last_name, created_at, updated_at) values (?, ?, 'PERSON', ?, ?, 'Beta', ?, ?, ?)", newPerson, tenantB,
                         "Beta Person " + n, "beta person " + n, "Person " + n, now, now);
                 as.update("insert into employees (id, tenant_id, person_id, employee_number, number_key, "
                         + "employment_type, start_date, created_at, updated_at) values (?, ?, ?, ?, ?, 'FULL_TIME', "
@@ -146,9 +147,10 @@ class HrRlsIT extends IntegrationTestSupport {
             case "courses" -> as.update("insert into courses (id, tenant_id, title, created_at, updated_at) "
                     + "values (?, ?, ?, ?, ?)", id, tenantB, "Course " + n, now, now);
             case "training_assignments" -> {
-                // one open assignment per course and employee: every call gets its own course
+                // one open assignment per course and employee: every call gets its own course, created as tenant B
+                // so only the training_assignments INSERT runs through the tested connection
                 UUID newCourse = UUID.randomUUID();
-                as.update("insert into courses (id, tenant_id, title, created_at, updated_at) values (?, ?, ?, ?, ?)",
+                OwnerJdbc.ownerAs(tenantB).update("insert into courses (id, tenant_id, title, created_at, updated_at) values (?, ?, ?, ?, ?)",
                         newCourse, tenantB, "Assigned course " + n, now, now);
                 as.update("insert into training_assignments (id, tenant_id, course_id, employee_id, status, assigned_at, "
                         + "updated_at) values (?, ?, ?, ?, 'ASSIGNED', ?, ?)", id, tenantB, newCourse, employee, now, now);

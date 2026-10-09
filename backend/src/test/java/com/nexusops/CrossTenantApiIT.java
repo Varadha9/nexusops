@@ -48,7 +48,7 @@ class CrossTenantApiIT extends IntegrationTestSupport {
     UUID leadB, opportunityB, stageB;
     UUID warehouseB, goodsB, purchaseOrderB, purchaseLineB, salesOrderB, ruleB;
     UUID ticketB, articleB, categoryB;
-    UUID departmentB, skillB, jobRoleB, employeeB, courseB, assignmentB, leaveRequestB, policyB, templateB, leaveTypeB;
+    UUID departmentB, skillB, jobRoleB, employeeB, courseB, assignmentB, leaveRequestB, policyB, templateB, leaveTypeB, holidayB;
     final java.util.concurrent.atomic.AtomicInteger hires = new java.util.concurrent.atomic.AtomicInteger();
 
     @BeforeEach
@@ -138,6 +138,8 @@ class CrossTenantApiIT extends IntegrationTestSupport {
                 apiB.get("/api/v1/hr/onboarding-templates"), "$[?(@.name == 'Standard onboarding')].id").get(0));
         leaveRequestB = com.nexusops.support.Api.id(apiB.post("/api/v1/hr/leave-requests", "{\"employeeId\":\"" + employeeB
                 + "\",\"typeId\":\"" + leaveTypeB + "\",\"startDate\":\"2027-03-01\",\"endDate\":\"2027-03-01\"}"));
+        holidayB = com.nexusops.support.Api.id(apiB.post("/api/v1/hr/holidays",
+                "{\"date\":\"2027-01-26\",\"name\":\"Beta day\"}"));
         policyB = com.nexusops.support.Api.id(apiB.post("/api/v1/hr/policies",
                 "{\"title\":\"Beta policy\",\"body\":\"Beta body\"}"));
     }
@@ -154,6 +156,11 @@ class CrossTenantApiIT extends IntegrationTestSupport {
     private ResultActions hireA(String fields) throws Exception {
         return as(ownerA, json(post("/api/v1/hr/employees"), "{\"employeeNumber\":\"A-" + hires.incrementAndGet()
                 + "\",\"startDate\":\"2026-01-05\"," + fields + "}"));
+    }
+
+    private String templateA() throws Exception {
+        String body = as(ownerA, get("/api/v1/hr/onboarding-templates")).andReturn().getResponse().getContentAsString();
+        return JsonPath.<java.util.List<String>>read(body, "$[?(@.name == 'Standard onboarding')].id").get(0);
     }
 
     private String leaveTypeA() throws Exception {
@@ -533,29 +540,72 @@ class CrossTenantApiIT extends IntegrationTestSupport {
                 .andExpect(status().isNotFound());
         as(ownerA, get("/api/v1/activities").param("subjectType", "EMPLOYEE").param("subjectId", employeeB.toString()))
                 .andExpect(status().isNotFound());
+        as(ownerA, json(post("/api/v1/hr/employees/" + employeeB + "/onboarding"), "{\"templateId\":\"" + templateA() + "\"}"))
+                .andExpect(status().isNotFound());
+        as(ownerA, json(post("/api/v1/hr/leave-requests/" + leaveRequestB + "/reject"), "{\"version\":0}"))
+                .andExpect(status().isNotFound());
+        as(ownerA, json(post("/api/v1/hr/training-assignments/" + assignmentB + "/cancel"), "{\"version\":0}"))
+                .andExpect(status().isNotFound());
+        as(ownerA, json(put("/api/v1/hr/job-roles/" + jobRoleB), "{\"title\":\"X\",\"requiredSkills\":[],\"version\":0}"))
+                .andExpect(status().isNotFound());
+        as(ownerA, json(put("/api/v1/hr/courses/" + courseB), "{\"title\":\"X\",\"skills\":[],\"version\":0}"))
+                .andExpect(status().isNotFound());
+        as(ownerA, post("/api/v1/hr/skills/" + skillB + "/archive")).andExpect(status().isNotFound());
+        as(ownerA, post("/api/v1/hr/leave-types/" + leaveTypeB + "/archive")).andExpect(status().isNotFound());
+        as(ownerA, json(post("/api/v1/hr/policies/" + policyB + "/unpublish"), "{\"version\":0}"))
+                .andExpect(status().isNotFound());
+        as(ownerA, post("/api/v1/hr/departments/" + departmentB + "/restore")).andExpect(status().isNotFound());
+        as(ownerA, delete("/api/v1/hr/holidays/" + holidayB)).andExpect(status().isNotFound());
         // body references → 400 on the field
         hireA("\"personId\":\"" + personB + "\"").andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.errors[0].field").value("personId"));
         hireA("\"person\":{\"firstName\":\"A\",\"lastName\":\"B\"},\"departmentId\":\"" + departmentB + "\"")
+                .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.errors[0].field").value("departmentId"));
         hireA("\"person\":{\"firstName\":\"A\",\"lastName\":\"B\"},\"jobRoleId\":\"" + jobRoleB + "\"")
+                .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.errors[0].field").value("jobRoleId"));
         hireA("\"person\":{\"firstName\":\"A\",\"lastName\":\"B\"},\"managerId\":\"" + employeeB + "\"")
+                .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.errors[0].field").value("managerId"));
         as(ownerA, json(post("/api/v1/hr/job-roles"), "{\"title\":\"R\",\"requiredSkills\":[{\"skillId\":\"" + skillB
-                + "\",\"minimumLevel\":1}]}")).andExpect(jsonPath("$.errors[0].field").value("requiredSkills[0].skillId"));
+                + "\",\"minimumLevel\":1}]}")).andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errors[0].field").value("requiredSkills[0].skillId"));
         as(ownerA, json(post("/api/v1/hr/leave-requests"), "{\"employeeId\":\"" + employeeB + "\",\"typeId\":\""
                 + leaveTypeA() + "\",\"startDate\":\"2027-03-01\",\"endDate\":\"2027-03-01\"}"))
+                .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.errors[0].field").value("employeeId"));
         as(ownerA, json(post("/api/v1/hr/training-assignments"), "{\"courseId\":\"" + courseB + "\",\"employeeId\":\""
-                + employeeB + "\"}")).andExpect(jsonPath("$.errors[0].field").value("courseId"));
+                + employeeB + "\"}")).andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errors[0].field").value("courseId"));
+        hireA("\"person\":{\"firstName\":\"A\",\"lastName\":\"B\"},\"onboardingTemplateId\":\"" + templateB + "\"")
+                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.errors[0].field").value("onboardingTemplateId"));
+        hireA("\"person\":{\"firstName\":\"A\",\"lastName\":\"B\"},\"userId\":\"" + userBId + "\"")
+                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.errors[0].field").value("userId"));
+        String employeeA = JsonPath.read(hireA("\"person\":{\"firstName\":\"Alpha\",\"lastName\":\"Worker\"}")
+                .andExpect(status().isCreated()).andReturn().getResponse().getContentAsString(), "$.id");
+        as(ownerA, json(post("/api/v1/hr/leave-requests"), "{\"employeeId\":\"" + employeeA + "\",\"typeId\":\""
+                + leaveTypeB + "\",\"startDate\":\"2027-03-01\",\"endDate\":\"2027-03-01\"}"))
+                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.errors[0].field").value("typeId"));
+        String courseA = JsonPath.read(as(ownerA, json(post("/api/v1/hr/courses"), "{\"title\":\"Alpha course\","
+                + "\"skills\":[]}")).andExpect(status().isCreated()).andReturn().getResponse().getContentAsString(), "$.id");
+        as(ownerA, json(post("/api/v1/hr/training-assignments"), "{\"courseId\":\"" + courseA + "\",\"employeeId\":\""
+                + employeeB + "\"}")).andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errors[0].field").value("employeeId"));
+        as(ownerA, json(put("/api/v1/hr/employees/" + employeeA), "{\"employeeNumber\":\"A-X\",\"startDate\":\"2026-01-05\","
+                + "\"managerId\":\"" + employeeB + "\",\"version\":0}")).andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errors[0].field").value("managerId"));
+        as(ownerA, json(put("/api/v1/hr/employees/" + employeeA), "{\"employeeNumber\":\"A-X\",\"startDate\":\"2026-01-05\","
+                + "\"departmentId\":\"" + departmentB + "\",\"version\":0}")).andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errors[0].field").value("departmentId"));
         // lists, search and the dashboard never show B's rows
-        as(ownerA, get("/api/v1/hr/employees")).andExpect(jsonPath("$.total").value(0));
+        as(ownerA, get("/api/v1/hr/employees")).andExpect(jsonPath("$.total").value(1)) // only A's own
+                .andExpect(jsonPath("$.items[0].id").value(employeeA));
         as(ownerA, get("/api/v1/hr/leave-requests")).andExpect(jsonPath("$.total").value(0));
         as(ownerA, get("/api/v1/hr/policies")).andExpect(jsonPath("$.total").value(0));
         as(ownerA, get("/api/v1/search").param("q", "beta")).andExpect(jsonPath("$[*].type",
                 Matchers.not(Matchers.hasItem("EMPLOYEE"))));
-        as(ownerA, get("/api/v1/hr/dashboard")).andExpect(jsonPath("$.activeHeadcount").value(0));
+        as(ownerA, get("/api/v1/hr/dashboard")).andExpect(jsonPath("$.activeHeadcount").value(1));
         // tenant B is untouched
         as(ownerB, get("/api/v1/hr/employees/" + employeeB)).andExpect(jsonPath("$.status").value("ACTIVE"));
     }
