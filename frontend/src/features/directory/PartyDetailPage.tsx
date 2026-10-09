@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { ErrorState, ListSkeleton, PageHeader } from '@/components/states'
 import { PERMISSIONS, useCan } from '@/features/auth/permissions'
 import { TicketsPanel } from '@/features/helpdesk/TicketsPanel'
+import { EmployeeRecordLink } from '@/features/hrms/EmployeeRecordLink'
 import { PartyOrdersPanel } from '@/features/inventory/PartyOrdersPanel'
 import { ActivityPanel } from '@/features/records/ActivityPanel'
 import { ArchiveControls } from '@/features/records/ArchiveControls'
@@ -87,6 +88,7 @@ export function PartyDetailPage() {
           )
         }
       />
+      {p.kind === 'PERSON' && <EmployeeRecordLink personId={p.id} />}
       {archived && (
         <p role="status" className="rounded-md border bg-muted/40 px-3 py-2 text-sm">
           This record is archived. Restore it to make changes or add activity, tasks and files.
