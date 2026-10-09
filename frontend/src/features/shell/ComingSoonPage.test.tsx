@@ -7,10 +7,10 @@ import { renderApp } from '@/test/renderApp'
 describe('ComingSoonPage', () => {
   it('names the blueprint phase of an enabled module', async () => {
     const server = fakeServer()
-    signedIn(server, testProfile({ modules: ['HRMS'] }))
-    renderApp({ server, path: '/app/hrms' })
-    expect(await screen.findByRole('heading', { name: 'HRMS' })).toBeInTheDocument()
-    expect(screen.getByText(/Phase 8/)).toBeInTheDocument()
+    signedIn(server)
+    renderApp({ server, path: '/app/workflows' })
+    expect(await screen.findByRole('heading', { name: 'Workflows' })).toBeInTheDocument()
+    expect(screen.getByText(/Phase 9/)).toBeInTheDocument()
   })
 
   it('explains a module that is not enabled', async () => {
