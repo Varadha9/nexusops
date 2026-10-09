@@ -9,6 +9,7 @@ import {
   anOnboardingTemplate,
   aSkill,
   aSkillGap,
+  aTrainingAssignment,
   pageOf,
 } from '@/test/records'
 import { renderApp } from '@/test/renderApp'
@@ -27,6 +28,7 @@ function setup(employee: EmployeeView = anEmployee(), permissions?: string[]) {
     .on('GET /hr/employees/:id/leave-balances', { body: [] })
     .on('GET /hr/leave-requests', { body: pageOf([]) })
     .on('GET /hr/leave-types', { body: [] })
+    .on('GET /hr/training-assignments', { body: pageOf([aTrainingAssignment({ overdue: true })]) })
     .on('GET /hr/members', { body: [] })
     .on('GET /activities', { body: pageOf([]) })
     .on('GET /documents', { body: [] })
@@ -34,6 +36,17 @@ function setup(employee: EmployeeView = anEmployee(), permissions?: string[]) {
 }
 
 describe('EmployeeDetailPage', () => {
+  it('lists the open training with an overdue mark, and offers to assign more', async () => {
+    const { server } = setup()
+    const training = await screen.findByRole('region', { name: 'Training' })
+    expect(await within(training).findByText('Advanced negotiation')).toBeInTheDocument()
+    expect(within(training).getByText('Overdue')).toBeInTheDocument()
+    expect(within(training).getByRole('button', { name: 'Assign training' })).toBeInTheDocument()
+    const call = server.callsTo('GET /hr/training-assignments')[0]
+    expect(call?.query.get('employeeId')).toBe('e-meera')
+    expect(call?.query.get('status')).toBe('ASSIGNED')
+  })
+
   it('shows the person, the employment and their skills against the role', async () => {
     setup()
     expect(await screen.findByRole('heading', { name: 'Meera Iyer · E-1' })).toBeInTheDocument()

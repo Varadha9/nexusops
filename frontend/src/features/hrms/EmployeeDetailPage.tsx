@@ -21,6 +21,7 @@ import { EMPLOYMENT_STATUS_LABELS, EMPLOYMENT_TYPE_LABELS } from './labels'
 import { LeaveCard } from './LeaveCard'
 import { OnboardingCard } from './OnboardingCard'
 import { SkillGapCard } from './SkillGapCard'
+import { TrainingCard } from './TrainingCard'
 
 function EmploymentCard({ employee: e }: { employee: EmployeeView }) {
   return (
@@ -189,7 +190,7 @@ function EmployeeDetail({ employeeId }: { employeeId: string }) {
         <SkillGapCard employee={e} />
         <OnboardingCard employee={e} />
         <LeaveCard employee={e} />
-        {/* training */}
+        <TrainingCard employee={e} />
       </div>
       <div id="tasks">
         <SubjectTasksPanel

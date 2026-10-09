@@ -4,8 +4,12 @@ import { EmployeeDetailPage } from './EmployeeDetailPage'
 import { EmployeesPage } from './EmployeesPage'
 import { HrIndex } from './HrIndex'
 import { LeavePage } from './LeavePage'
+import { MyHrPage } from './MyHrPage'
+import { PoliciesPage } from './PoliciesPage'
+import { PolicyDetailPage } from './PolicyDetailPage'
+import { TrainingPage } from './TrainingPage'
 
-/** /app/hrms/* children (Tasks 10–11 add theirs). */
+/** /app/hrms/* children. */
 export const hrmsChildren: RouteObject[] = [
   { index: true, element: <HrIndex /> },
   {
@@ -29,6 +33,38 @@ export const hrmsChildren: RouteObject[] = [
     element: (
       <RequirePermission anyOf={[PERMISSIONS.hrEmployeeRead]}>
         <EmployeeDetailPage />
+      </RequirePermission>
+    ),
+  },
+  {
+    path: 'training',
+    element: (
+      <RequirePermission anyOf={[PERMISSIONS.hrEmployeeRead]}>
+        <TrainingPage />
+      </RequirePermission>
+    ),
+  },
+  {
+    path: 'policies',
+    element: (
+      <RequirePermission anyOf={[PERMISSIONS.hrSelf, PERMISSIONS.hrPolicy]}>
+        <PoliciesPage />
+      </RequirePermission>
+    ),
+  },
+  {
+    path: 'policies/:policyId',
+    element: (
+      <RequirePermission anyOf={[PERMISSIONS.hrSelf, PERMISSIONS.hrPolicy]}>
+        <PolicyDetailPage />
+      </RequirePermission>
+    ),
+  },
+  {
+    path: 'me',
+    element: (
+      <RequirePermission anyOf={[PERMISSIONS.hrSelf]}>
+        <MyHrPage />
       </RequirePermission>
     ),
   },
