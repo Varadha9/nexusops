@@ -71,6 +71,9 @@ class TrainingApiIT extends IntegrationTestSupport {
         String[][] cases = {
                 {"{\"title\":\"\"}", "title"},
                 {"{\"title\":\"T\",\"durationHours\":0}", "durationHours"},
+                {"{\"title\":\"T\",\"durationHours\":0.04}", "durationHours"},
+                {"{\"title\":\"T\",\"durationHours\":999.05}", "durationHours"},
+                {"{\"title\":\"T\",\"durationHours\":1e999999999}", "durationHours"},
                 {"{\"title\":\"T\",\"link\":\"ftp://x\"}", "link"},
                 {"{\"title\":\"T\",\"skills\":[{\"skillId\":\"" + negotiation + "\",\"level\":9}]}", "skills[0].level"},
                 {"{\"title\":\"T\",\"skills\":[{\"skillId\":\"" + UUID.randomUUID() + "\",\"level\":1}]}",
@@ -169,10 +172,10 @@ class TrainingApiIT extends IntegrationTestSupport {
         owner.post("/api/v1/hr/employees/" + meera + "/end", "{\"endDate\":\"" + LocalDate.now(ZoneOffset.UTC).minusDays(1)
                 + "\",\"version\":" + version + "}").andExpect(status().isOk());
         owner.get("/api/v1/hr/training-assignments?employeeId=" + meera).andExpect(jsonPath("$.items[*].status")
-                .value(Matchers.contains("CANCELLED")));
+                .value(Matchers.contains("CANCELLED")))
+                .andExpect(jsonPath("$.items[0].id").value(id.toString()));
         owner.post("/api/v1/hr/training-assignments", "{\"courseId\":\"" + enough + "\",\"employeeId\":\"" + meera + "\"}")
                 .andExpect(status().isConflict()).andExpect(jsonPath("$.detail").value("This employee has left."));
-        assertThat(id).isNotNull();
     }
 
     @Test

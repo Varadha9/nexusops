@@ -13,6 +13,7 @@ import com.nexusops.notifications.OutgoingMail;
 import com.nexusops.shared.Ids;
 import com.nexusops.shared.TenantContext;
 import com.nexusops.shared.Text;
+import com.nexusops.shared.db.TenantLocks;
 import com.nexusops.shared.web.ApiProblem;
 import com.nexusops.shared.web.PageResponse;
 import com.nexusops.shared.web.Paging;
@@ -46,18 +47,20 @@ public class TrainingService {
     private final EmployeeService employees;
     private final Members members;
     private final HrClock clock;
+    private final TenantLocks locks;
     private final AuditService audit;
     private final ApplicationEventPublisher events;
     private final String appBaseUrl;
 
     TrainingService(TrainingAssignmentRepository assignments, CourseService courses, EmployeeService employees,
-            Members members, HrClock clock, AuditService audit, ApplicationEventPublisher events,
+            Members members, HrClock clock, TenantLocks locks, AuditService audit, ApplicationEventPublisher events,
             @Value("${nexusops.app.base-url}") String appBaseUrl) {
         this.assignments = assignments;
         this.courses = courses;
         this.employees = employees;
         this.members = members;
         this.clock = clock;
+        this.locks = locks;
         this.audit = audit;
         this.events = events;
         this.appBaseUrl = appBaseUrl;
@@ -83,6 +86,7 @@ public class TrainingService {
     public TrainingAssignmentView assign(UUID courseId, UUID employeeId, LocalDate dueOn) {
         Course course = courses.resolve(courseId, "courseId");
         Employee employee = employees.resolve(employeeId, "employeeId");
+        locks.lock("hr-training-" + employeeId);
         HrRecords.requireNotArchived(course.isArchived());
         if (EmploymentStatus.of(employee.getStartDate(), employee.getEndDate(), clock.today()) == EmploymentStatus.LEFT) {
             throw ApiProblem.conflict(LEFT);
@@ -146,6 +150,7 @@ public class TrainingService {
     }
 
     private TrainingAssignmentView doComplete(TrainingAssignment a, String rawNote, Long version) {
+        locks.lock("hr-training-" + a.getEmployeeId());
         HrRecords.checkVersion(a.getVersion(), version);
         String note = Text.optional(rawNote, 500, "note");
         if (a.getStatus() != TrainingStatus.ASSIGNED) {
@@ -155,7 +160,8 @@ public class TrainingService {
         assignments.flush();
         employees.raiseSkills(a.getEmployeeId(), courses.taught(a.getCourseId()));
         audit.record(AuditEntry.of("TrainingCompleted", "TrainingAssignment", a.getId())
-                .withAfter(note == null ? Map.of() : Map.of("note", note)));
+                .withAfter(note == null ? Map.of("courseId", a.getCourseId().toString())
+                        : Map.of("courseId", a.getCourseId().toString(), "note", note)));
         return views(List.of(a)).getFirst();
     }
 

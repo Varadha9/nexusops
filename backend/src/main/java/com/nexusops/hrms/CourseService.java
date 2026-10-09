@@ -37,6 +37,7 @@ public class CourseService implements CourseFinder {
     static final String LEVEL = "Choose a level from 1 to 5.";
     static final String REPEATED = "Each skill can be listed once.";
     static final String DURATION = "Use more than 0 and at most 999 hours.";
+    private static final BigDecimal MAX_BEFORE_ROUNDING = new BigDecimal("999.05");
     static final String LINK = "Use a web address starting with http:// or https://.";
 
     private final CourseRepository courses;
@@ -146,9 +147,16 @@ public class CourseService implements CourseFinder {
     private Draft validate(CourseCommand c, Course current) {
         String title = HrRecords.collapse(Text.required(c.title(), 200, "title"));
         String description = Text.optional(c.description(), 5000, "description");
-        BigDecimal duration = c.durationHours() == null ? null : c.durationHours().setScale(1, RoundingMode.HALF_UP);
-        if (duration != null && (duration.signum() <= 0 || duration.compareTo(BigDecimal.valueOf(999)) > 0)) {
-            throw ApiProblem.badRequestField("durationHours", DURATION);
+        BigDecimal duration = c.durationHours();
+        if (duration != null) {
+            // Magnitude first, so a huge exponent is never expanded by setScale.
+            if (duration.signum() <= 0 || duration.compareTo(MAX_BEFORE_ROUNDING) >= 0) {
+                throw ApiProblem.badRequestField("durationHours", DURATION);
+            }
+            duration = duration.setScale(1, RoundingMode.HALF_UP);
+            if (duration.signum() <= 0) {
+                throw ApiProblem.badRequestField("durationHours", DURATION);
+            }
         }
         String link = Text.optional(c.link(), 500, "link");
         if (link != null && !link.toLowerCase(Locale.ROOT).startsWith("http://")
