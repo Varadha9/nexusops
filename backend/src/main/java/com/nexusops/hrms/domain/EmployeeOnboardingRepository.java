@@ -13,9 +13,9 @@ public interface EmployeeOnboardingRepository extends JpaRepository<EmployeeOnbo
 
     boolean existsByEmployeeId(UUID employeeId);
 
-    @Query(value = "select task_id from employee_onboarding_tasks where onboarding_id = :onboardingId",
-            nativeQuery = true)
-    List<UUID> taskIds(UUID onboardingId);
+    @Query(value = "select task_id from employee_onboarding_tasks where onboarding_id = :onboardingId "
+            + "and tenant_id = :tenantId", nativeQuery = true)
+    List<UUID> taskIds(UUID onboardingId, UUID tenantId);
 
     @Modifying
     @Query(value = "insert into employee_onboarding_tasks (id, tenant_id, onboarding_id, task_id) "

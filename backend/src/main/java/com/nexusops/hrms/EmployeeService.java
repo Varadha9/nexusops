@@ -130,6 +130,7 @@ public class EmployeeService {
         }
         locks.lock(LOCK);
         References refs = references(c.departmentId(), c.jobRoleId(), c.managerId(), c.userId(), null);
+        hireHooks.forEach(h -> h.validate(c));
         PartyBrief existing = null;
         if (c.personId() != null) {
             existing = parties.briefs(List.of(c.personId())).get(c.personId());

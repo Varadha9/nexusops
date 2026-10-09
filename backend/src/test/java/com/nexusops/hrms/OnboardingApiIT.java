@@ -126,6 +126,52 @@ class OnboardingApiIT extends IntegrationTestSupport {
     }
 
     @Test
+    void anUnknownTemplateOnTheHireIsABodyErrorAndCreatesNothing() throws Exception {
+        String body = "{\"person\":{\"firstName\":\"Meera\",\"lastName\":\"Iyer\"},\"employeeNumber\":\"E-9\","
+                + "\"startDate\":\"2026-11-02\",\"onboardingTemplateId\":\"" + UUID.randomUUID() + "\"}";
+        owner.post("/api/v1/hr/employees", body).andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errors[0].field").value("onboardingTemplateId"));
+        owner.get("/api/v1/hr/employees").andExpect(jsonPath("$.total").value(0));
+        // a taken employee number would be a 409, but the body error comes first
+        TestHr.hire(owner, "Arun", "Shah", "E-9");
+        owner.post("/api/v1/hr/employees", body).andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errors[0].field").value("onboardingTemplateId"));
+        owner.get("/api/v1/hr/employees").andExpect(jsonPath("$.total").value(1));
+    }
+
+    @Test
+    void tasksForDisabledAccountsGoToWhoeverStartedOnboarding() throws Exception {
+        UUID role = TestRoles.create(mvc, owner.session(), "Manager", "collaboration.task.read");
+        Workspace managerLogin = members.create(ws.tenantId(), Set.of(role));
+        Workspace hireLogin = members.create(ws.tenantId(), Set.of(role));
+        UUID manager = Api.id(owner.post("/api/v1/hr/employees", "{\"person\":{\"firstName\":\"Ravi\",\"lastName\":"
+                + "\"Kumar\"},\"employeeNumber\":\"M-1\",\"startDate\":\"2026-01-05\",\"userId\":\""
+                + userId(managerLogin.email()) + "\"}"));
+        UUID id = Api.id(owner.post("/api/v1/hr/employees", "{\"person\":{\"firstName\":\"Meera\",\"lastName\":"
+                + "\"Iyer\"},\"employeeNumber\":\"E-1\",\"startDate\":\"2026-11-02\",\"managerId\":\"" + manager
+                + "\",\"userId\":\"" + userId(hireLogin.email()) + "\"}"));
+        OwnerJdbc.ownerAs(ws.tenantId()).update("update users set status = 'DISABLED' where email in (?, ?)",
+                managerLogin.email(), hireLogin.email());
+        owner.post("/api/v1/hr/employees/" + id + "/onboarding", "{\"templateId\":\"" + standard() + "\"}")
+                .andExpect(status().isOk()).andExpect(jsonPath("$.onboarding.total").value(5));
+        owner.get("/api/v1/tasks?subjectType=EMPLOYEE&subjectId=" + id + "&size=10")
+                .andExpect(jsonPath("$.items[*].assignee.id").value(Matchers.everyItem(
+                        Matchers.is(userId(ws.email()).toString()))));
+    }
+
+    @Test
+    void cancelledTasksNoLongerCountTowardsProgress() throws Exception {
+        UUID id = TestHr.hire(owner, "Arun", "Shah", "E-2");
+        owner.post("/api/v1/hr/employees/" + id + "/onboarding", "{\"templateId\":\"" + standard() + "\"}")
+                .andExpect(status().isOk());
+        String taskId = Api.read(owner.get("/api/v1/tasks?subjectType=EMPLOYEE&subjectId=" + id + "&size=10"),
+                "$.items[?(@.title == '30-day check-in')].id").toString().replaceAll("[\\[\\]\"]", "");
+        owner.post("/api/v1/tasks/" + taskId + "/status", "{\"status\":\"CANCELLED\"}").andExpect(status().isOk());
+        owner.get("/api/v1/hr/employees/" + id).andExpect(jsonPath("$.onboarding.total").value(4))
+                .andExpect(jsonPath("$.onboarding.done").value(0));
+    }
+
+    @Test
     void templatesAreEditedAsAWhole() throws Exception {
         UUID id = Api.id(owner.post("/api/v1/hr/onboarding-templates", "{\"name\":\"Sales onboarding\",\"items\":["
                 + "{\"title\":\"Shadow a sales call\",\"owner\":\"MANAGER\",\"dueOffsetDays\":5},"
