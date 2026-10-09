@@ -62,10 +62,25 @@ class OpenApiContractIT extends IntegrationTestSupport {
                 "\"/api/v1/helpdesk/sla-policies/{priority}\"", "\"/api/v1/helpdesk/articles\"",
                 "\"/api/v1/helpdesk/articles/{id}\"", "\"/api/v1/helpdesk/articles/{id}/publish\"",
                 "\"/api/v1/helpdesk/articles/{id}/unpublish\"", "\"/api/v1/helpdesk/articles/{id}/archive\"",
-                "\"/api/v1/helpdesk/dashboard\"");
-        // the HelpDesk and CRM dashboards keep their own schemas (same Java name, different shape)
+                "\"/api/v1/helpdesk/dashboard\"",
+                "\"/api/v1/hr/employees\"", "\"/api/v1/hr/employees/{id}\"", "\"/api/v1/hr/employees/{id}/end\"",
+                "\"/api/v1/hr/employees/{id}/reinstate\"", "\"/api/v1/hr/employees/{id}/skills\"",
+                "\"/api/v1/hr/employees/{id}/skill-gap\"", "\"/api/v1/hr/employees/{id}/onboarding\"",
+                "\"/api/v1/hr/employees/{id}/leave-balances\"", "\"/api/v1/hr/employees/{id}/leave-adjustments\"",
+                "\"/api/v1/hr/departments\"", "\"/api/v1/hr/skills\"", "\"/api/v1/hr/job-roles\"",
+                "\"/api/v1/hr/job-roles/{id}\"", "\"/api/v1/hr/onboarding-templates\"",
+                "\"/api/v1/hr/leave-types\"", "\"/api/v1/hr/holidays\"", "\"/api/v1/hr/holidays/{id}\"",
+                "\"/api/v1/hr/leave-requests\"", "\"/api/v1/hr/leave-requests/{id}/approve\"",
+                "\"/api/v1/hr/leave-requests/{id}/reject\"", "\"/api/v1/hr/leave-requests/{id}/cancel\"",
+                "\"/api/v1/hr/leave/away\"",
+                "\"/api/v1/hr/courses\"", "\"/api/v1/hr/courses/{id}\"", "\"/api/v1/hr/training-assignments\"",
+                "\"/api/v1/hr/training-assignments/{id}/complete\"",
+                "\"/api/v1/hr/policies\"", "\"/api/v1/hr/policies/{id}\"", "\"/api/v1/hr/policies/{id}/publish\"",
+                "\"/api/v1/hr/me\"", "\"/api/v1/hr/me/leave-requests\"", "\"/api/v1/hr/me/training/{id}/complete\"",
+                "\"/api/v1/hr/dashboard\"");
+        // the HelpDesk, HRMS and CRM dashboards keep their own schemas (same Java name, different shape)
         java.util.Map<String, Object> schemas = com.jayway.jsonpath.JsonPath.read(doc, "$.components.schemas");
-        assertThat(schemas).containsKeys("LeadStats", "HelpDeskDashboardView");
+        assertThat(schemas).containsKeys("LeadStats", "HelpDeskDashboardView", "HrDashboardView");
         // hierarchy rules (ADR-0004): no changing a role, or disabling/re-enabling/re-roling a user, stronger than the caller
         for (String op : new String[] {"$.paths['/api/v1/roles/{id}'].patch", "$.paths['/api/v1/roles/{id}'].delete",
                 "$.paths['/api/v1/roles/{id}/permissions'].put", "$.paths['/api/v1/users/{id}'].patch",
