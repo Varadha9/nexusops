@@ -44,8 +44,8 @@ progress and the most common skill gaps.
 - Payroll, compensation and benefits; performance reviews; attendance and time tracking; recruitment: later.
 - Half-day leave, accrual and pro-rating of allowances, carry-over between years: later (allowances are full calendar
   years; HR can adjust any balance by hand).
-- Offboarding checklists, org-chart drawing, nested departments: later (departments are flat; managers form the
-  reporting line).
+- Offboarding checklists, org-chart drawing, nested departments and department heads: later (departments are flat;
+  managers form the reporting line).
 - Employee self-editing of their own profile and self-service access to their own documents: later.
 - Scheduled reminders (overdue training, onboarding nudges): Phase 9 (workflow engine).
 
@@ -70,7 +70,7 @@ stored with the request, so balances are sums, and editing holidays later doesn'
 | D2 | Employee | `employees`: person (a non-archived directory **person**; one employee record per person), employee number (1–40, unique ignoring case), department, job role, manager (another employee; no cycles), employment type `FULL_TIME`/`PART_TIME`/`CONTRACT`/`INTERN`, start date (required), end date (null until employment ends; ≥ start date), linked member (an active team member, at most one employee each, optional), `version`. **Status is derived** in the workspace time zone: `UPCOMING` (start > today), `ACTIVE`, `LEFT` (end < today). Hiring takes an existing person id or a new person (first name, last name, email, phone), which HRMS creates in the directory. |
 | D3 | Directory sync | New `PartyService.recordEmployment(personId, employeeNumber, since, active)` (module rule, no permission check, audited `PartyRoleChanged`) sets the `EMPLOYEE` role: on hire and edit (number, start date, active), on ending employment (inactive), on undoing it (active). New SPI `directory.EmploymentGuard#beforeEmployeeRoleChange(personId)`; HRMS refuses while an employee record exists → `409 "This person's employment is managed in HRMS."`. |
 | D4 | Ending employment | `POST employees/{id}/end {endDate, reason?}` sets the end date (may be past, today or future); pending and approved leave starting after the end date is cancelled; open training assignments are cancelled; the directory role turns inactive. `POST …/reinstate` clears the end date (role active again). Employees are never deleted. |
-| D5 | Departments | Name (1–80, unique ignoring case), description, head (an employee, optional), archive/restore. Archiving is refused while active or upcoming employees are in it (`409 "Move this department's employees first."`). Flat (no parent). |
+| D5 | Departments | Name (1–80, unique ignoring case), description (≤ 500), archive/restore. Archiving is refused while active or upcoming employees are in it (`409 "Move this department's employees first."`). Flat (no parent). |
 | D6 | Job roles | Title (1–80, unique ignoring case), department (optional), description, **required skills** (skill + minimum level 1–5, each skill once), archive/restore (archived roles can't be chosen; employees keep them). |
 | D7 | Skills | Catalog: name (1–60, unique ignoring case), archive/restore. **Employee skills:** skill + level 1–5 + optional note, set by HR (`PUT employees/{id}/skills` full replacement). Levels: 1 aware, 2 basic, 3 competent, 4 proficient, 5 expert. |
 | D8 | Skill gap | Deterministic (the "skill-gap insights" baseline): for an employee with a job role, each required skill whose held level is missing or below the minimum is a gap `{skill, required, held}`; each gap lists the active courses that teach that skill at a level ≥ the required level (recommended trainings). Dashboard: the five skills with the most gaps among active employees. |
@@ -108,8 +108,8 @@ All tables are tenant-owned with `ENABLE`/`FORCE ROW LEVEL SECURITY` and the sta
 
 | Route | Authorization |
 |---|---|
-| `GET employees?q=&status=&departmentId=&jobRoleId=&managerId=&page=&size=`, `GET employees/{id}`, `GET employees/{id}/skill-gap`, `GET employees/{id}/leave-balances?year=` | `hr.employee.read` |
-| `POST employees`, `PUT employees/{id}`, `POST employees/{id}/end`, `POST …/reinstate`, `PUT …/skills`, `POST …/onboarding`, `POST …/leave-adjustments` | `hr.employee.update` |
+| `GET employees?q=&status=&departmentId=&jobRoleId=&managerId=&personId=&page=&size=`, `GET employees/{id}`, `GET employees/{id}/skill-gap`, `GET employees/{id}/leave-balances?year=` | `hr.employee.read` |
+| `GET members?q=` (active team members to link), `POST employees`, `PUT employees/{id}`, `POST employees/{id}/end`, `POST …/reinstate`, `PUT …/skills`, `POST …/onboarding`, `POST …/leave-adjustments` | `hr.employee.update` |
 | `GET departments`, `GET job-roles`, `GET skills`, `GET leave-types`, `GET holidays?year=`, `GET onboarding-templates` (each `?archived=`) | `hr.employee.read` (leave types and holidays also with `hr.self.service`) |
 | Writes on those, `POST …/archive|restore` | `hr.settings.manage` |
 | `GET leave-requests?status=&employeeId=&from=&to=`, `POST leave-requests`, `POST leave-requests/{id}/approve|reject|cancel`, `GET leave/away?from=&to=` | `hr.leave.approve` |
