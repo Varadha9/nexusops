@@ -39,4 +39,9 @@ public final class TestHr {
                 + "\",\"lastName\":\"" + lastName + "\"},\"employeeNumber\":\"" + number
                 + "\",\"startDate\":\"2026-01-05\"}").andExpect(status().isCreated()));
     }
+
+    public static UUID leaveType(Api owner, String name) throws Exception {
+        java.util.List<String> ids = Api.read(owner.get("/api/v1/hr/leave-types"), "$[?(@.name == '" + name + "')].id");
+        return UUID.fromString(ids.getFirst());
+    }
 }

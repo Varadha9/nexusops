@@ -6,6 +6,9 @@ import com.nexusops.hrms.EmployeeSummary;
 import com.nexusops.hrms.EmployeeView;
 import com.nexusops.hrms.EmploymentStatus;
 import com.nexusops.hrms.EndEmployment;
+import com.nexusops.hrms.LeaveAdjustmentCommand;
+import com.nexusops.hrms.LeaveBalanceView;
+import com.nexusops.hrms.LeaveService;
 import com.nexusops.hrms.OnboardingService;
 import com.nexusops.hrms.SkillGapView;
 import com.nexusops.hrms.web.HrDtos.EmployeeRequest;
@@ -14,6 +17,7 @@ import com.nexusops.hrms.web.HrDtos.SkillsRequest;
 import com.nexusops.hrms.web.HrDtos.StartOnboardingRequest;
 import com.nexusops.hrms.web.HrDtos.VersionRequest;
 import com.nexusops.shared.web.PageResponse;
+import java.util.List;
 import java.util.UUID;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -33,10 +37,12 @@ class EmployeeController {
 
     private final EmployeeService employees;
     private final OnboardingService onboarding;
+    private final LeaveService leave;
 
-    EmployeeController(EmployeeService employees, OnboardingService onboarding) {
+    EmployeeController(EmployeeService employees, OnboardingService onboarding, LeaveService leave) {
         this.employees = employees;
         this.onboarding = onboarding;
+        this.leave = leave;
     }
 
     @GetMapping
@@ -96,5 +102,17 @@ class EmployeeController {
     @PreAuthorize("hasAuthority('hr.employee.update')")
     EmployeeView startOnboarding(@PathVariable UUID id, @RequestBody StartOnboardingRequest request) {
         return onboarding.start(id, request.templateId());
+    }
+
+    @GetMapping("/{id}/leave-balances")
+    @PreAuthorize("hasAuthority('hr.employee.read')")
+    List<LeaveBalanceView> balances(@PathVariable UUID id, @RequestParam(required = false) Integer year) {
+        return leave.balances(id, year);
+    }
+
+    @PostMapping("/{id}/leave-adjustments")
+    @PreAuthorize("hasAuthority('hr.employee.update')")
+    List<LeaveBalanceView> adjust(@PathVariable UUID id, @RequestBody LeaveAdjustmentCommand body) {
+        return leave.adjust(id, body);
     }
 }

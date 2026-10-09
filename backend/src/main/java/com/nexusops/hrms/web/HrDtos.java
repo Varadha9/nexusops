@@ -6,6 +6,8 @@ import com.nexusops.hrms.EmployeeSkillCommand;
 import com.nexusops.hrms.EmployeeUpdate;
 import com.nexusops.hrms.EmploymentType;
 import com.nexusops.hrms.JobRoleCommand;
+import com.nexusops.hrms.LeaveRequestCommand;
+import com.nexusops.hrms.LeaveTypeCommand;
 import com.nexusops.hrms.NewPerson;
 import com.nexusops.hrms.OnboardingItemCommand;
 import com.nexusops.hrms.OnboardingTemplateCommand;
@@ -61,4 +63,20 @@ final class HrDtos {
     }
 
     record StartOnboardingRequest(UUID templateId) {}
+
+    record LeaveTypeRequest(String name, Boolean paid, Integer annualAllowance, Long version) {
+        LeaveTypeCommand command() {
+            return new LeaveTypeCommand(name, paid, annualAllowance);
+        }
+    }
+
+    record HolidayRequest(LocalDate date, String name) {}
+
+    record LeaveRequestRequest(UUID employeeId, UUID typeId, LocalDate startDate, LocalDate endDate, String reason) {
+        LeaveRequestCommand command() {
+            return new LeaveRequestCommand(typeId, startDate, endDate, reason);
+        }
+    }
+
+    record DecisionRequest(String note, Long version) {}
 }
