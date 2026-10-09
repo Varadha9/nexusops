@@ -14,6 +14,7 @@ import com.nexusops.support.TestRoles;
 import com.nexusops.support.TestTenants;
 import com.nexusops.support.TestTenants.Workspace;
 import java.time.LocalDate;
+import java.time.ZoneOffset;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -152,6 +153,15 @@ class EmployeeApiIT extends IntegrationTestSupport {
                 Matchers.contains("Ben B")));
     }
 
+    @Test
+    void anUpdateWithoutAnEmploymentTypeKeepsTheCurrentOne() throws Exception {
+        UUID id = Api.id(owner.post("/api/v1/hr/employees", "{\"person\":{\"firstName\":\"Ivy\",\"lastName\":\"Jones\"},"
+                + "\"employeeNumber\":\"I-1\",\"employmentType\":\"INTERN\",\"startDate\":\"2026-01-05\"}")
+                .andExpect(status().isCreated()));
+        owner.put("/api/v1/hr/employees/" + id, "{\"employeeNumber\":\"I-1\",\"startDate\":\"2026-01-05\","
+                + "\"version\":0}").andExpect(status().isOk()).andExpect(jsonPath("$.employmentType").value("INTERN"));
+    }
+
     private static String update(String number, UUID managerId, long version) {
         return "{\"employeeNumber\":\"" + number + "\",\"startDate\":\"2026-01-05\",\"employmentType\":\"FULL_TIME\","
                 + "\"managerId\":" + (managerId == null ? "null" : "\"" + managerId + "\"") + ",\"version\":" + version
@@ -162,7 +172,7 @@ class EmployeeApiIT extends IntegrationTestSupport {
     void endingEmploymentTurnsTheDirectoryRoleOffAndReinstatingTurnsItOn() throws Exception {
         UUID id = TestHr.hire(owner, "Dev", "Patel", "E-9");
         String person = Api.read(owner.get("/api/v1/hr/employees/" + id), "$.person.id");
-        String yesterday = LocalDate.now().minusDays(1).toString();
+        String yesterday = LocalDate.now(ZoneOffset.UTC).minusDays(1).toString();
         owner.post("/api/v1/hr/employees/" + id + "/end", "{\"endDate\":\"2025-12-31\",\"version\":0}")
                 .andExpect(status().isBadRequest()).andExpect(jsonPath("$.errors[0].field").value("endDate"));
         owner.post("/api/v1/hr/employees/" + id + "/end", "{\"endDate\":\"" + yesterday + "\",\"reason\":\"Resigned\","
@@ -247,7 +257,7 @@ class EmployeeApiIT extends IntegrationTestSupport {
                 + "\"employeeNumber\":\"S-1\",\"departmentId\":\"" + sales + "\",\"startDate\":\"2026-01-05\"}"));
         owner.post("/api/v1/hr/departments/" + sales + "/archive", "").andExpect(status().isConflict())
                 .andExpect(jsonPath("$.detail").value("Move this department's employees first."));
-        owner.post("/api/v1/hr/employees/" + id + "/end", "{\"endDate\":\"" + LocalDate.now().minusDays(1)
+        owner.post("/api/v1/hr/employees/" + id + "/end", "{\"endDate\":\"" + LocalDate.now(ZoneOffset.UTC).minusDays(1)
                 + "\",\"version\":0}").andExpect(status().isOk());
         owner.post("/api/v1/hr/departments/" + sales + "/archive", "").andExpect(status().isOk());
     }

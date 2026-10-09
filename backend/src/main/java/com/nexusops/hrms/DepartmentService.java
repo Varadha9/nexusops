@@ -91,6 +91,7 @@ public class DepartmentService {
     public DepartmentView archive(UUID id) {
         Department department = find(id);
         if (!department.isArchived()) {
+            locks.lock(EmployeeService.LOCK);
             if (employees.anyCurrentIn(id, clock.today())) {
                 throw ApiProblem.conflict(EMPLOYEES_LEFT);
             }

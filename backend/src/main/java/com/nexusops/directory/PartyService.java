@@ -238,9 +238,6 @@ public class PartyService {
         if (!CurrentAuthorities.has(needed)) {
             throw ApiProblem.forbidden(FORBIDDEN);
         }
-        if (role == PartyRoleType.EMPLOYEE) {
-            employmentGuards.forEach(g -> g.beforeEmployeeRoleChange(id));
-        }
         if (party.isArchived()) {
             throw ApiProblem.conflict(ARCHIVED);
         }
@@ -253,6 +250,9 @@ public class PartyService {
             throw ApiProblem.badRequestField("employeeNumber", "Only employees have an employee number.");
         }
         locks.lock(ROLES_LOCK);
+        if (role == PartyRoleType.EMPLOYEE) {
+            employmentGuards.forEach(g -> g.beforeEmployeeRoleChange(id));
+        }
         if (number != null && roles.employeeNumberTaken(number, id)) {
             throw ApiProblem.conflictField("employeeNumber", EMPLOYEE_NUMBER_TAKEN);
         }

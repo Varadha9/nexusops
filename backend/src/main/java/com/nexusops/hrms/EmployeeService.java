@@ -59,7 +59,8 @@ public class EmployeeService {
     static final String END_BEFORE_START = "The end date can't be before the start date.";
     static final String LEVEL = "Choose a level from 1 to 5.";
     static final String REPEATED = "Each skill can be listed once.";
-    private static final String LOCK = "hr-employees";
+    /** Serializes hires, edits and department archiving, so loops and archived references can't slip through. */
+    static final String LOCK = "hr-employees";
 
     private final EmployeeRepository employees;
     private final EmployeeSkillRepository employeeSkills;
@@ -127,6 +128,7 @@ public class EmployeeService {
             Text.required(c.person().firstName(), 80, "person.firstName");
             Text.required(c.person().lastName(), 80, "person.lastName");
         }
+        locks.lock(LOCK);
         References refs = references(c.departmentId(), c.jobRoleId(), c.managerId(), c.userId(), null);
         PartyBrief existing = null;
         if (c.personId() != null) {
@@ -137,7 +139,6 @@ public class EmployeeService {
             HrRecords.requireNotArchived(existing.archived());
         }
         refs.requireNotArchived(null);
-        locks.lock(LOCK);
         if (existing != null && employees.existsByPersonId(existing.id())) {
             throw ApiProblem.conflictField("personId", ALREADY_EMPLOYED);
         }
@@ -165,14 +166,14 @@ public class EmployeeService {
         Employee employee = find(id);
         HrRecords.checkVersion(employee.getVersion(), version);
         String number = number(c.employeeNumber());
-        EmploymentType type = c.employmentType() == null ? EmploymentType.FULL_TIME : c.employmentType();
+        EmploymentType type = c.employmentType() == null ? employee.getEmploymentType() : c.employmentType();
         LocalDate start = required(c.startDate(), "startDate", "Enter a start date.");
         if (employee.getEndDate() != null && employee.getEndDate().isBefore(start)) {
             throw ApiProblem.badRequestField("startDate", END_BEFORE_START);
         }
+        locks.lock(LOCK);
         References refs = references(c.departmentId(), c.jobRoleId(), c.managerId(), c.userId(), employee);
         refs.requireNotArchived(employee);
-        locks.lock(LOCK);
         if (employees.existsByNumberKeyAndIdNot(HrRecords.key(number), id)) {
             throw ApiProblem.conflictField("employeeNumber", NUMBER_TAKEN);
         }
