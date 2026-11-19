@@ -9,6 +9,7 @@ one permission model, one operational event stream — with modular business cap
 - CRM (Phase 5): `docs/superpowers/specs/2026-10-07-crm-mvp-design.md`
 - Inventory (Phase 6): `docs/superpowers/specs/2026-10-08-inventory-mvp-design.md`
 - HelpDesk (Phase 7): `docs/superpowers/specs/2026-10-09-helpdesk-mvp-design.md`
+- HRMS (Phase 8): `docs/superpowers/specs/2026-10-09-hrms-mvp-design.md`
 - Decisions: `docs/decisions/`
 - Implementation plans: `docs/superpowers/plans/`
 
@@ -95,6 +96,25 @@ Switch the module on under **Settings → Modules**. Every HelpDesk permission s
 - **Dashboard**: open tickets by status and priority, unassigned, breached and at-risk tickets, and for the last 30
   days the first-response and resolution times, the SLA met rates and the reopen rate.
 - Party, Customer 360 and product pages show their tickets. Tickets have tasks, files and activity like any record.
+
+## HRMS (Phase 8)
+Switch the module on under **Settings → Modules**; every HRMS permission switches off with it (ADR-0011, ADR-0013).
+
+- **Employees** are directory persons with an employment record: number, department, job role, manager, type, start
+  and end dates, and optionally the team member account they sign in with. Hiring can create the person in the
+  directory; the directory's employee role follows the record and can't be edited by hand while HRMS manages it.
+  Ending employment cancels leave and training after the last day; it can be undone.
+- **Job roles** list the skills they need (levels 1–5). Every employee page shows their **skill gaps** and recommends
+  courses that teach enough; completing a course raises the skill.
+- **Onboarding** templates (a "Standard onboarding" is ready) turn into tasks for HR, the manager and the new hire.
+- **Leave** is counted in working days (weekends and the workspace's public holidays don't count) against yearly
+  balances; HR can adjust a balance. Employees ask for leave under **My HR**; their manager is emailed, approvers decide
+  under **HRMS → Leave**, and the employee is emailed. Nobody decides their own request.
+- **Training** assigns courses with optional due dates; overdue ones are flagged.
+- **Policies** are a searchable library; published ones are readable by everyone with self-service.
+- **Overview**: headcount by department, joiners and leavers, who's away, pending approvals, overdue training,
+  onboarding in progress and the most common skill gaps.
+- Settings → HRMS holds departments, job roles, skills, leave types, public holidays and onboarding templates.
 
 ## Try the API (local)
 ```bash
