@@ -59,9 +59,13 @@ describe('EmployeeDetailPage', () => {
       '/app/directory/p-meera',
     )
     const gap = screen.getByRole('region', { name: 'Skills and gaps' })
-    expect(within(gap).getByText('Negotiation')).toBeInTheDocument()
-    expect(await within(gap).findByText(/needs 4 · has 2/)).toBeInTheDocument()
-    expect(within(gap).getByText('Advanced negotiation')).toBeInTheDocument()
+    // "Negotiation" is both held and a gap: look in each list
+    const held = within(gap).getByRole('list', { name: 'Skills held' })
+    expect(within(held).getByText('Negotiation')).toBeInTheDocument()
+    const gaps = await within(gap).findByRole('list', { name: 'Skill gaps' })
+    expect(within(gaps).getByText('Negotiation')).toBeInTheDocument()
+    expect(gaps).toHaveTextContent('needs 4 · has 2')
+    expect(within(gaps).getByText('Advanced negotiation')).toBeInTheDocument()
   })
 
   it('edits the skills as a whole', async () => {

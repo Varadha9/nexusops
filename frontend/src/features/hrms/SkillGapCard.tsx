@@ -53,7 +53,7 @@ export function SkillGapCard({ employee }: { employee: EmployeeView }) {
         {employee.skills.length === 0 ? (
           <p className="text-muted-foreground">No skills recorded.</p>
         ) : (
-          <ul className="space-y-1">
+          <ul aria-label="Skills held" className="space-y-1">
             {employee.skills.map((s) => (
               <li key={s.skillId} className="flex justify-between gap-3">
                 <span>{s.name}</span>
@@ -80,7 +80,7 @@ export function SkillGapCard({ employee }: { employee: EmployeeView }) {
               Meets every skill {gap.data.jobRole.title} needs.
             </p>
           ) : (
-            <ul className="space-y-3">
+            <ul aria-label="Skill gaps" className="space-y-3">
               {gap.data.gaps.map((g) => (
                 <li key={g.skill.id} className="space-y-1">
                   <p className="font-medium">{g.skill.name}</p>
