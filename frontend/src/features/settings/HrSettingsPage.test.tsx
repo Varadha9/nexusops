@@ -1,5 +1,6 @@
 import { screen, waitFor, within } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
+import { todayIso } from '@/lib/format'
 import { fakeServer } from '@/test/fakeServer'
 import { signedIn, testProfile } from '@/test/fixtures'
 import {
@@ -97,6 +98,25 @@ describe('HrSettingsPage', () => {
     )
     await user.click(within(holidays).getByRole('button', { name: 'Remove Republic Day' }))
     await waitFor(() => expect(server.callsTo('DELETE /hr/holidays/:id')[0]?.params.id).toBe('h-1'))
+  })
+
+  it('shows the year of a holiday just added', async () => {
+    const { server, user } = setup()
+    const later = String(Number(todayIso().slice(0, 4)) + 3)
+    server.on('POST /hr/holidays', {
+      status: 201,
+      body: aHoliday({ id: 'h-3', date: `${later}-01-26`, name: 'Republic Day' }),
+    })
+    const holidays = await screen.findByRole('region', { name: 'Public holidays' })
+    await user.type(within(holidays).getByLabelText('Date'), `${later}-01-26`)
+    await user.type(within(holidays).getByLabelText('Holiday name'), 'Republic Day')
+    await user.click(within(holidays).getByRole('button', { name: 'Add holiday' }))
+    await waitFor(() => expect(within(holidays).getByLabelText('Year')).toHaveValue(later))
+    await waitFor(() =>
+      expect(server.callsTo('GET /hr/holidays').some((c) => c.query.get('year') === later)).toBe(
+        true,
+      ),
+    )
   })
 
   it('creates a leave type with an allowance or unlimited', async () => {

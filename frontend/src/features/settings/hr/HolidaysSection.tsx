@@ -57,6 +57,8 @@ export function HolidaysSection() {
       await api.post('/hr/holidays', { date: values.date, name: values.name.trim() })
       await invalidateHr(queryClient)
       toast.success(`${values.name.trim()} added.`)
+      // show the year the holiday went into, so it's visible in the list
+      setYear(Number(values.date.slice(0, 4)))
       form.reset()
     } catch (e) {
       if (!applyFieldErrors(e, form.setError, HOLIDAY_FIELDS)) setError(problemMessage(e))
@@ -91,11 +93,13 @@ export function HolidaysSection() {
             value={String(year)}
             onChange={(e) => setYear(Number(e.target.value))}
           >
-            {[thisYear - 1, thisYear, thisYear + 1].map((y) => (
-              <option key={y} value={String(y)}>
-                {y}
-              </option>
-            ))}
+            {[...new Set([thisYear - 1, thisYear, thisYear + 1, year])]
+              .sort((a, b) => a - b)
+              .map((y) => (
+                <option key={y} value={String(y)}>
+                  {y}
+                </option>
+              ))}
           </NativeSelect>
         </div>
       </div>
