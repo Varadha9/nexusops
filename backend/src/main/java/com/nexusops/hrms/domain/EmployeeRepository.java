@@ -29,6 +29,10 @@ public interface EmployeeRepository extends JpaRepository<Employee, UUID>, JpaSp
             + "and (e.endDate is null or e.endDate >= :today)")
     boolean anyCurrentIn(UUID departmentId, LocalDate today);
 
+    /** A fresh read of the employment dates, for re-checks under a per-employee lock (I-1). */
+    @Query("select new com.nexusops.hrms.domain.EmploymentDates(e.startDate, e.endDate) from Employee e where e.id = :id")
+    Optional<EmploymentDates> employmentDates(UUID id);
+
     /** id → manager id, for the loop check (D2). Small per workspace. */
     @Query("select e.id, e.managerId from Employee e where e.managerId is not null")
     List<Object[]> managerPairs();

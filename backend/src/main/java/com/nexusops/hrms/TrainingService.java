@@ -5,6 +5,7 @@ import com.nexusops.audit.AuditService;
 import com.nexusops.collaboration.MemberRef;
 import com.nexusops.hrms.domain.Course;
 import com.nexusops.hrms.domain.Employee;
+import com.nexusops.hrms.domain.EmploymentDates;
 import com.nexusops.hrms.domain.TrainingAssignment;
 import com.nexusops.hrms.domain.TrainingAssignmentRepository;
 import com.nexusops.identity.Members;
@@ -86,9 +87,11 @@ public class TrainingService {
     public TrainingAssignmentView assign(UUID courseId, UUID employeeId, LocalDate dueOn) {
         Course course = courses.resolve(courseId, "courseId");
         Employee employee = employees.resolve(employeeId, "employeeId");
-        locks.lock("hr-training-" + employeeId);
+        locks.lock(EmployeeService.trainingLock(employee.getId()));
         HrRecords.requireNotArchived(course.isArchived());
-        if (EmploymentStatus.of(employee.getStartDate(), employee.getEndDate(), clock.today()) == EmploymentStatus.LEFT) {
+        // I-1: the employment may have ended while we waited; check against the committed dates.
+        EmploymentDates now = employees.currentDates(employee.getId());
+        if (EmploymentStatus.of(now.startDate(), now.endDate(), clock.today()) == EmploymentStatus.LEFT) {
             throw ApiProblem.conflict(LEFT);
         }
         if (assignments.existsByCourseIdAndEmployeeIdAndStatus(courseId, employeeId, TrainingStatus.ASSIGNED)) {
@@ -150,7 +153,7 @@ public class TrainingService {
     }
 
     private TrainingAssignmentView doComplete(TrainingAssignment a, String rawNote, Long version) {
-        locks.lock("hr-training-" + a.getEmployeeId());
+        locks.lock(EmployeeService.trainingLock(a.getEmployeeId()));
         HrRecords.checkVersion(a.getVersion(), version);
         String note = Text.optional(rawNote, 500, "note");
         if (a.getStatus() != TrainingStatus.ASSIGNED) {

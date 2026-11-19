@@ -13,6 +13,7 @@ import com.nexusops.hrms.domain.Employee;
 import com.nexusops.hrms.domain.EmployeeRepository;
 import com.nexusops.hrms.domain.EmployeeSkill;
 import com.nexusops.hrms.domain.EmployeeSkillRepository;
+import com.nexusops.hrms.domain.EmploymentDates;
 import com.nexusops.hrms.domain.JobRole;
 import com.nexusops.hrms.domain.Skill;
 import com.nexusops.identity.Members;
@@ -59,7 +60,14 @@ public class EmployeeService {
     static final String END_BEFORE_START = "The end date can't be before the start date.";
     static final String LEVEL = "Choose a level from 1 to 5.";
     static final String REPEATED = "Each skill can be listed once.";
-    /** Serializes hires, edits and department archiving, so loops and archived references can't slip through. */
+    /**
+     * Serializes hires, edits and department archiving, so loops and archived references can't slip through.
+     *
+     * <p>Lock order, never taken in reverse: {@code hr-employees} → {@code hr-leave-<employee>} →
+     * {@code hr-training-<employee>} → {@code directory-identity} → {@code directory-roles}. The per-employee
+     * locks ({@link #leaveLock}, {@link #trainingLock}) serialize ending employment against leave requests,
+     * adjustments, training assignments, completions and skill edits for that employee.
+     */
     static final String LOCK = "hr-employees";
 
     private final EmployeeRepository employees;
@@ -199,6 +207,10 @@ public class EmployeeService {
         if (date.isBefore(employee.getStartDate())) {
             throw ApiProblem.badRequestField("endDate", END_BEFORE_START);
         }
+        // I-1: queue behind (and block) leave requests and training assignments for this employee, so they
+        // either commit before the end (and are cancelled below) or re-read the end date after it.
+        locks.lock(leaveLock(id));
+        locks.lock(trainingLock(id));
         if (employee.getEndDate() != null) {
             throw ApiProblem.conflict(ENDED);
         }
@@ -301,6 +313,19 @@ public class EmployeeService {
     Employee find(UUID id) {
         TenantContext.requireTenantId();
         return employees.findById(id).orElseThrow(() -> ApiProblem.notFound(HrRecords.NOT_FOUND));
+    }
+
+    static String leaveLock(UUID employeeId) {
+        return "hr-leave-" + employeeId;
+    }
+
+    static String trainingLock(UUID employeeId) {
+        return "hr-training-" + employeeId;
+    }
+
+    /** The employment dates as committed now; call it under a per-employee lock to re-check them (I-1). */
+    EmploymentDates currentDates(UUID id) {
+        return employees.employmentDates(id).orElseThrow(() -> ApiProblem.notFound(HrRecords.NOT_FOUND));
     }
 
     Employee resolve(UUID id, String field) {

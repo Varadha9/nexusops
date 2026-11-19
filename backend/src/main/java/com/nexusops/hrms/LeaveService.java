@@ -4,6 +4,7 @@ import com.nexusops.audit.AuditEntry;
 import com.nexusops.audit.AuditService;
 import com.nexusops.collaboration.MemberRef;
 import com.nexusops.hrms.domain.Employee;
+import com.nexusops.hrms.domain.EmploymentDates;
 import com.nexusops.hrms.domain.LeaveAdjustment;
 import com.nexusops.hrms.domain.LeaveAdjustmentRepository;
 import com.nexusops.hrms.domain.LeaveRequest;
@@ -188,6 +189,7 @@ public class LeaveService {
         String reason = Text.required(c.reason(), 200, "reason");
         LeaveType type = types.resolve(c.typeId(), "typeId");
         Employee employee = employees.find(employeeId);
+        locks.lock(EmployeeService.leaveLock(employee.getId())); // a concurrent request can't overdraw meanwhile
         LeaveAdjustment adjustment = adjustments.saveAndFlush(new LeaveAdjustment(Ids.newId(), employee.getId(),
                 type.getId(), c.year(), days, reason, TenantContext.userId().orElse(null), Instant.now()));
         audit.record(AuditEntry.of("LeaveAdjusted", "Employee", employee.getId()).withAfter(Map.of("typeId",
@@ -232,18 +234,16 @@ public class LeaveService {
             throw ApiProblem.badRequestField("endDate", YEAR_SPLIT);
         }
         String reason = Text.optional(c.reason(), 500, "reason");
-        if (c.startDate().isBefore(employee.getStartDate())) {
-            throw ApiProblem.badRequestField("startDate", BEFORE_EMPLOYMENT);
-        }
-        if (employee.getEndDate() != null && c.endDate().isAfter(employee.getEndDate())) {
-            throw ApiProblem.badRequestField("endDate", AFTER_EMPLOYMENT);
-        }
+        requireWithinEmployment(c, employee.getStartDate(), employee.getEndDate());
         int days = WorkingDays.count(c.startDate(), c.endDate(), holidays.between(c.startDate(), c.endDate()));
         if (days < 1) {
             throw ApiProblem.badRequestField("endDate", NO_WORKING_DAY);
         }
         HrRecords.requireNotArchived(type.isArchived());
-        locks.lock("hr-leave-" + employee.getId());
+        locks.lock(EmployeeService.leaveLock(employee.getId()));
+        // I-1: the employment may have ended while we waited; check against the committed dates.
+        EmploymentDates now = employees.currentDates(employee.getId());
+        requireWithinEmployment(c, now.startDate(), now.endDate());
         if (requests.overlaps(employee.getId(), LIVE, c.startDate(), c.endDate())) {
             throw ApiProblem.conflict(OVERLAP);
         }
@@ -258,6 +258,15 @@ public class LeaveService {
                 "endDate", c.endDate().toString(), "days", days)));
         notifyManager(employee, r);
         return views(List.of(r)).getFirst();
+    }
+
+    private static void requireWithinEmployment(LeaveRequestCommand c, LocalDate start, LocalDate end) {
+        if (c.startDate().isBefore(start)) {
+            throw ApiProblem.badRequestField("startDate", BEFORE_EMPLOYMENT);
+        }
+        if (end != null && c.endDate().isAfter(end)) {
+            throw ApiProblem.badRequestField("endDate", AFTER_EMPLOYMENT);
+        }
     }
 
     private LeaveRequestView decide(UUID id, LeaveStatus outcome, String rawNote, Long version, String action,
