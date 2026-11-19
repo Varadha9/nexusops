@@ -266,6 +266,7 @@ public class EmployeeService {
                 throw ApiProblem.badRequestField("skills[" + i + "].skillId", SkillService.UNKNOWN);
             }
         }
+        locks.lock(trainingLock(id)); // completions raise skills under the same lock (M-4)
         Set<UUID> held = heldLevels(id).keySet();
         for (UUID skillId : ids) {
             if (found.get(skillId).isArchived() && !held.contains(skillId)) {

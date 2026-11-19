@@ -32,7 +32,7 @@ import org.springframework.transaction.support.TransactionTemplate;
  * Writes for one employee that race each other are serialized on the per-employee locks (hr-leave-*,
  * hr-training-*). Each test runs one write in a transaction held open until the competing request is either
  * done or waiting on an advisory lock; it then commits, and the competitor must see the committed state.
- * I-1: a request re-reads the employment under its lock.
+ * I-1: a request re-reads the employment under its lock. M-4: editing skills waits for a completion.
  */
 @AutoConfigureMockMvc
 class PerEmployeeLocksIT extends IntegrationTestSupport {
@@ -40,6 +40,7 @@ class PerEmployeeLocksIT extends IntegrationTestSupport {
     @Autowired MockMvc mvc;
     @Autowired RecordingMailSender mail;
     @Autowired EmployeeService employees;
+    @Autowired TrainingService training;
     @Autowired TransactionTemplate tx;
 
     Workspace ws;
@@ -89,6 +90,23 @@ class PerEmployeeLocksIT extends IntegrationTestSupport {
         assertThat(response.getContentAsString()).contains(TrainingService.LEFT);
         assertThat(OwnerJdbc.ownerAs(ws.tenantId()).queryForObject("select count(*) from training_assignments "
                 + "where employee_id = ? and status = 'ASSIGNED'", Long.class, meera)).isZero();
+    }
+
+    @Test
+    void editingSkillsWhileATrainingIsCompletedWaitsInsteadOfFailing() throws Exception {
+        UUID skill = TestHr.skill(owner, "Negotiation");
+        UUID course = Api.id(owner.post("/api/v1/hr/courses", "{\"title\":\"Negotiation\",\"skills\":[{\"skillId\":\""
+                + skill + "\",\"level\":3}]}"));
+        UUID assignment = Api.id(owner.post("/api/v1/hr/training-assignments", "{\"courseId\":\"" + course
+                + "\",\"employeeId\":\"" + meera + "\"}"));
+        long version = ((Number) Api.read(owner.get("/api/v1/hr/employees/" + meera), "$.version")).longValue();
+        MockHttpServletResponse response = race(() -> training.complete(assignment, null, 0L),
+                () -> owner.put("/api/v1/hr/employees/" + meera + "/skills", "{\"skills\":[{\"skillId\":\"" + skill
+                        + "\",\"level\":2}],\"version\":" + version + "}").andReturn().getResponse());
+        // the completion raised the skill and bumped the employee, so the edit is now stale: a 409, never a 500
+        assertThat(response.getStatus()).isEqualTo(409);
+        assertThat(OwnerJdbc.ownerAs(ws.tenantId()).queryForObject("select level from employee_skills "
+                + "where employee_id = ? and skill_id = ?", Integer.class, meera, skill)).isEqualTo(3);
     }
 
     private Runnable end(LocalDate endDate) throws Exception {
