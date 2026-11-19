@@ -159,9 +159,14 @@ public class CourseService implements CourseFinder {
             }
         }
         String link = Text.optional(c.link(), 500, "link");
-        if (link != null && !link.toLowerCase(Locale.ROOT).startsWith("http://")
-                && !link.toLowerCase(Locale.ROOT).startsWith("https://")) {
-            throw ApiProblem.badRequestField("link", LINK);
+        if (link != null) {
+            String lower = link.toLowerCase(Locale.ROOT);
+            if (!lower.startsWith("http://") && !lower.startsWith("https://")) {
+                throw ApiProblem.badRequestField("link", LINK);
+            }
+            // the DB check is case-sensitive (^https?://): store the scheme in lower case
+            int colon = link.indexOf(':');
+            link = lower.substring(0, colon) + link.substring(colon);
         }
         Map<UUID, Integer> taught = new LinkedHashMap<>();
         List<TaughtSkill> raw = c.skills() == null ? List.of() : c.skills();

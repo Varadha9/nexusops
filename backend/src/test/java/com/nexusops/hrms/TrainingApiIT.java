@@ -163,6 +163,16 @@ class TrainingApiIT extends IntegrationTestSupport {
     }
 
     @Test
+    void aCapitalisedLinkSchemeIsStoredInLowerCase() throws Exception {
+        UUID id = Api.id(owner.post("/api/v1/hr/courses", "{\"title\":\"Shouty link\",\"link\":\"HTTPS://Learn.Example/Neg\"}")
+                .andExpect(status().isCreated()).andExpect(jsonPath("$.link").value("https://Learn.Example/Neg")));
+        owner.put("/api/v1/hr/courses/" + id, "{\"title\":\"Shouty link\",\"link\":\"Http://learn.example\",\"version\":0}")
+                .andExpect(status().isOk()).andExpect(jsonPath("$.link").value("http://learn.example"));
+        owner.post("/api/v1/hr/courses", "{\"title\":\"Bad link\",\"link\":\"ftp://learn.example\"}")
+                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.errors[0].field").value("link"));
+    }
+
+    @Test
     void dueDatesOutsideTheSupportedRangeAreFieldErrors() throws Exception {
         UUID meera = employeeWithGap(null);
         UUID enough = course("Advanced negotiation", negotiation, 4);
