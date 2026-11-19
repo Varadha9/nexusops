@@ -128,9 +128,10 @@ public class ArticleService {
         KbArticle article = find(id);
         checkVersion(article, version);
         if (article.getStatus() != ArticleStatus.ARCHIVED) {
+            Map<String, Object> before = snapshot(article);
             article.archive(Instant.now());
             articles.flush();
-            audit.record(AuditEntry.of("ArticleArchived", "KbArticle", id).withBefore(snapshot(article)));
+            audit.record(AuditEntry.of("ArticleArchived", "KbArticle", id).withBefore(before).withAfter(snapshot(article)));
         }
         return view(article);
     }

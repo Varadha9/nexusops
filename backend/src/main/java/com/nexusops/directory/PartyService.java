@@ -21,6 +21,7 @@ import com.nexusops.shared.web.Paging;
 import jakarta.persistence.criteria.Root;
 import jakarta.persistence.criteria.Subquery;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
@@ -59,12 +60,15 @@ public class PartyService {
     private final PartyRoleRepository roles;
     private final TenantLocks locks;
     private final AuditService audit;
+    private final List<EmploymentGuard> employmentGuards;
 
-    PartyService(PartyRepository parties, PartyRoleRepository roles, TenantLocks locks, AuditService audit) {
+    PartyService(PartyRepository parties, PartyRoleRepository roles, TenantLocks locks, AuditService audit,
+            List<EmploymentGuard> employmentGuards) {
         this.parties = parties;
         this.roles = roles;
         this.locks = locks;
         this.audit = audit;
+        this.employmentGuards = employmentGuards;
     }
 
     @Transactional(readOnly = true)
@@ -246,6 +250,9 @@ public class PartyService {
             throw ApiProblem.badRequestField("employeeNumber", "Only employees have an employee number.");
         }
         locks.lock(ROLES_LOCK);
+        if (role == PartyRoleType.EMPLOYEE) {
+            employmentGuards.forEach(g -> g.beforeEmployeeRoleChange(id));
+        }
         if (number != null && roles.employeeNumberTaken(number, id)) {
             throw ApiProblem.conflictField("employeeNumber", EMPLOYEE_NUMBER_TAKEN);
         }
@@ -291,6 +298,31 @@ public class PartyService {
         row.update(RoleStatus.ACTIVE, row.getSince(), null);
         roles.saveAndFlush(row);
         audit.record(AuditEntry.of("PartyRoleChanged", "Party", id).withBefore(before).withAfter(roleSnapshot(row)));
+    }
+
+    /**
+     * HRMS's employment rule (D3): makes the person's EMPLOYEE role match their employment record. Not a user action,
+     * so no permission check here; the employee number must still be unique among employees.
+     */
+    @Transactional
+    public void recordEmployment(UUID personId, String employeeNumber, LocalDate since, boolean active) {
+        Party party = find(personId);
+        if (party.getKind() != PartyKind.PERSON) {
+            throw new IllegalArgumentException("Only a person can be an employee");
+        }
+        locks.lock(ROLES_LOCK);
+        if (roles.employeeNumberTaken(employeeNumber, personId)) {
+            throw ApiProblem.conflictField("employeeNumber", EMPLOYEE_NUMBER_TAKEN);
+        }
+        PartyRole row = roles.findByPartyIdAndRole(personId, PartyRoleType.EMPLOYEE).orElse(null);
+        Map<String, Object> before = row == null ? null : roleSnapshot(row);
+        if (row == null) {
+            row = new PartyRole(Ids.newId(), personId, PartyRoleType.EMPLOYEE);
+        }
+        row.update(active ? RoleStatus.ACTIVE : RoleStatus.INACTIVE, since, employeeNumber);
+        roles.saveAndFlush(row);
+        audit.record(AuditEntry.of("PartyRoleChanged", "Party", personId).withBefore(before)
+                .withAfter(roleSnapshot(row)));
     }
 
     private static Map<String, Object> roleSnapshot(PartyRole row) {

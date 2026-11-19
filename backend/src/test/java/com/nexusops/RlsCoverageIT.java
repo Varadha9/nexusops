@@ -26,7 +26,11 @@ class RlsCoverageIT extends IntegrationTestSupport {
             "documents", "document_contents", "pipeline_stages", "leads", "opportunities",
             "number_sequences", "warehouses", "stock_levels", "stock_movements", "purchase_orders",
             "purchase_order_lines", "sales_orders", "sales_order_lines", "reorder_rules", "password_resets",
-            "ticket_categories", "sla_policies", "tickets", "ticket_messages", "kb_articles");
+            "ticket_categories", "sla_policies", "tickets", "ticket_messages", "kb_articles",
+            "departments", "skills", "job_roles", "job_role_skills", "employees", "employee_skills",
+            "onboarding_templates", "onboarding_template_items", "employee_onboardings",
+            "employee_onboarding_tasks", "leave_types", "holidays", "leave_requests", "leave_adjustments",
+            "courses", "course_skills", "training_assignments", "hr_policies");
 
     @Autowired JdbcTemplate jdbc;
 

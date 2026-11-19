@@ -220,6 +220,7 @@ export type SubjectType =
   | 'SALES_ORDER'
   | 'TICKET'
   | 'KB_ARTICLE'
+  | 'EMPLOYEE'
 
 export interface MemberRef {
   id: string
@@ -801,4 +802,247 @@ export interface HelpDeskDashboard {
     resolutionMetRate?: number | null
     reopenRate?: number | null
   }
+}
+
+export type EmploymentType = 'FULL_TIME' | 'PART_TIME' | 'CONTRACT' | 'INTERN'
+export type EmploymentStatus = 'UPCOMING' | 'ACTIVE' | 'LEFT'
+export type OnboardingOwner = 'HR' | 'MANAGER' | 'EMPLOYEE'
+export type LeaveStatus = 'PENDING' | 'APPROVED' | 'REJECTED' | 'CANCELLED'
+export type TrainingStatus = 'ASSIGNED' | 'COMPLETED' | 'CANCELLED'
+export type PolicyStatus = 'DRAFT' | 'PUBLISHED' | 'ARCHIVED'
+
+export interface DepartmentRef {
+  id: string
+  name: string
+}
+export interface SkillRef {
+  id: string
+  name: string
+}
+export interface JobRoleRef {
+  id: string
+  title: string
+}
+export interface EmployeeRef {
+  id: string
+  name: string
+  employeeNumber: string
+}
+export interface PersonRef {
+  id: string
+  name: string
+  email: string | null
+  phone: string | null
+}
+export interface CourseRef {
+  id: string
+  title: string
+}
+export interface LeaveTypeRef {
+  id: string
+  name: string
+}
+
+export interface SkillView {
+  id: string
+  name: string
+  archivedAt: string | null
+  version: number
+}
+export interface DepartmentView {
+  id: string
+  name: string
+  description: string | null
+  archivedAt: string | null
+  version: number
+}
+export interface RequiredSkillView {
+  skillId: string
+  name: string
+  minimumLevel: number
+}
+export interface JobRoleView {
+  id: string
+  title: string
+  department: DepartmentRef | null
+  description: string | null
+  requiredSkills: RequiredSkillView[]
+  archivedAt: string | null
+  version: number
+}
+export interface EmployeeSkillView {
+  skillId: string
+  name: string
+  level: number
+  note: string | null
+}
+export interface OnboardingProgress {
+  templateId: string
+  templateName: string
+  done: number
+  total: number
+}
+export interface EmployeeView {
+  id: string
+  person: PersonRef
+  employeeNumber: string
+  department: DepartmentRef | null
+  jobRole: JobRoleRef | null
+  manager: EmployeeRef | null
+  employmentType: EmploymentType
+  startDate: string
+  endDate: string | null
+  endReason: string | null
+  status: EmploymentStatus
+  user: MemberRef | null
+  skills: EmployeeSkillView[]
+  onboarding: OnboardingProgress | null
+  createdAt: string
+  updatedAt: string
+  version: number
+}
+export interface EmployeeSummary {
+  id: string
+  name: string
+  employeeNumber: string
+  department: DepartmentRef | null
+  jobRole: JobRoleRef | null
+  manager: EmployeeRef | null
+  status: EmploymentStatus
+  startDate: string
+  endDate: string | null
+}
+export interface SkillGapView {
+  employee: EmployeeRef
+  jobRole: JobRoleRef | null
+  gaps: Array<{
+    skill: SkillRef
+    required: number
+    held: number | null
+    recommendedCourses: CourseRef[]
+  }>
+}
+export interface OnboardingItemView {
+  title: string
+  description: string | null
+  owner: OnboardingOwner
+  dueOffsetDays: number
+}
+export interface OnboardingTemplateView {
+  id: string
+  name: string
+  items: OnboardingItemView[]
+  archivedAt: string | null
+  version: number
+}
+export interface LeaveTypeView {
+  id: string
+  name: string
+  paid: boolean
+  annualAllowance: number | null
+  archivedAt: string | null
+  version: number
+}
+export interface HolidayView {
+  id: string
+  date: string
+  name: string
+}
+export interface LeaveRequestView {
+  id: string
+  employee: EmployeeRef
+  type: LeaveTypeRef
+  startDate: string
+  endDate: string
+  days: number
+  reason: string | null
+  status: LeaveStatus
+  requestedBy: MemberRef | null
+  requestedAt: string
+  decidedBy: MemberRef | null
+  decidedAt: string | null
+  decisionNote: string | null
+  cancelledAt: string | null
+  version: number
+}
+export interface LeaveBalanceView {
+  type: LeaveTypeRef
+  paid: boolean
+  entitlement: number | null
+  taken: number
+  pending: number
+  available: number | null
+}
+export interface AwayView {
+  employee: EmployeeRef
+  type: LeaveTypeRef
+  startDate: string
+  endDate: string
+}
+export interface TaughtSkillView {
+  skillId: string
+  name: string
+  level: number
+}
+export interface CourseView {
+  id: string
+  title: string
+  description: string | null
+  durationHours: number | null
+  link: string | null
+  skills: TaughtSkillView[]
+  archivedAt: string | null
+  version: number
+}
+export interface TrainingAssignmentView {
+  id: string
+  course: CourseRef
+  employee: EmployeeRef
+  dueOn: string | null
+  status: TrainingStatus
+  overdue: boolean
+  assignedBy: MemberRef | null
+  assignedAt: string
+  completedOn: string | null
+  completionNote: string | null
+  version: number
+}
+export interface PolicyView {
+  id: string
+  title: string
+  body: string
+  status: PolicyStatus
+  author: MemberRef | null
+  publishedAt: string | null
+  createdAt: string
+  updatedAt: string
+  version: number
+}
+export interface PolicySummary {
+  id: string
+  title: string
+  excerpt: string
+  status: PolicyStatus
+  publishedAt: string | null
+  updatedAt: string
+}
+export interface MeView {
+  employee: EmployeeView
+  year: number
+  balances: LeaveBalanceView[]
+  requests: LeaveRequestView[]
+  trainings: TrainingAssignmentView[]
+}
+export interface HrDashboard {
+  activeHeadcount: number
+  byDepartment: Array<{ department: DepartmentRef | null; employees: number }>
+  upcomingStarts: number
+  joinersLast90Days: number
+  leaversLast90Days: number
+  awayToday: AwayView[]
+  awayNext7Days: AwayView[]
+  pendingLeaveRequests: number
+  overdueTrainings: number
+  onboardingInProgress: number
+  topSkillGaps: Array<{ skill: SkillRef; employees: number }>
 }

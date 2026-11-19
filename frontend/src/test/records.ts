@@ -36,6 +36,24 @@ import type {
   TicketContext,
   TicketSummary,
   TicketView,
+  AwayView,
+  CourseView,
+  DepartmentView,
+  EmployeeSummary,
+  EmployeeView,
+  HolidayView,
+  HrDashboard,
+  JobRoleView,
+  LeaveBalanceView,
+  LeaveRequestView,
+  LeaveTypeView,
+  MeView,
+  OnboardingTemplateView,
+  PolicySummary,
+  PolicyView,
+  SkillGapView,
+  SkillView,
+  TrainingAssignmentView,
 } from '@/lib/api/types'
 
 export function pageOf<T>(items: T[], total = items.length, page = 0, size = 20): Page<T> {
@@ -666,6 +684,268 @@ export function aHelpDeskDashboard(overrides: Partial<HelpDeskDashboard> = {}): 
       resolutionMetRate: 1,
       reopenRate: 0.25,
     },
+    ...overrides,
+  }
+}
+
+const SALES = { id: 'd-sales', name: 'Sales' }
+const NEGOTIATION = { id: 's-neg', name: 'Negotiation' }
+const EXECUTIVE = { id: 'jr-exec', title: 'Account executive' }
+const MEERA_EMP = { id: 'e-meera', name: 'Meera Iyer', employeeNumber: 'E-1' }
+const ANNUAL = { id: 'lt-annual', name: 'Annual leave' }
+
+export function aSkill(overrides: Partial<SkillView> = {}): SkillView {
+  return { id: 's-neg', name: 'Negotiation', archivedAt: null, version: 0, ...overrides }
+}
+
+export function aDepartment(overrides: Partial<DepartmentView> = {}): DepartmentView {
+  return {
+    id: 'd-sales',
+    name: 'Sales',
+    description: null,
+    archivedAt: null,
+    version: 0,
+    ...overrides,
+  }
+}
+
+export function aJobRole(overrides: Partial<JobRoleView> = {}): JobRoleView {
+  return {
+    id: 'jr-exec',
+    title: 'Account executive',
+    department: SALES,
+    description: null,
+    requiredSkills: [{ skillId: 's-neg', name: 'Negotiation', minimumLevel: 4 }],
+    archivedAt: null,
+    version: 0,
+    ...overrides,
+  }
+}
+
+export function anEmployee(overrides: Partial<EmployeeView> = {}): EmployeeView {
+  return {
+    id: 'e-meera',
+    person: { id: 'p-meera', name: 'Meera Iyer', email: 'meera@deccan.test', phone: null },
+    employeeNumber: 'E-1',
+    department: SALES,
+    jobRole: EXECUTIVE,
+    manager: null,
+    employmentType: 'FULL_TIME',
+    startDate: '2026-01-05',
+    endDate: null,
+    endReason: null,
+    status: 'ACTIVE',
+    user: null,
+    skills: [{ skillId: 's-neg', name: 'Negotiation', level: 2, note: null }],
+    onboarding: null,
+    createdAt: '2026-01-05T09:00:00Z',
+    updatedAt: '2026-01-05T09:00:00Z',
+    version: 0,
+    ...overrides,
+  }
+}
+
+export function anEmployeeSummary(overrides: Partial<EmployeeSummary> = {}): EmployeeSummary {
+  return {
+    id: 'e-meera',
+    name: 'Meera Iyer',
+    employeeNumber: 'E-1',
+    department: SALES,
+    jobRole: EXECUTIVE,
+    manager: null,
+    status: 'ACTIVE',
+    startDate: '2026-01-05',
+    endDate: null,
+    ...overrides,
+  }
+}
+
+export function aSkillGap(overrides: Partial<SkillGapView> = {}): SkillGapView {
+  return {
+    employee: MEERA_EMP,
+    jobRole: EXECUTIVE,
+    gaps: [
+      {
+        skill: NEGOTIATION,
+        required: 4,
+        held: 2,
+        recommendedCourses: [{ id: 'c-adv', title: 'Advanced negotiation' }],
+      },
+    ],
+    ...overrides,
+  }
+}
+
+export function anOnboardingTemplate(
+  overrides: Partial<OnboardingTemplateView> = {},
+): OnboardingTemplateView {
+  return {
+    id: 'ot-std',
+    name: 'Standard onboarding',
+    items: [
+      { title: 'Prepare laptop and accounts', description: null, owner: 'HR', dueOffsetDays: 0 },
+      { title: '30-day check-in', description: null, owner: 'MANAGER', dueOffsetDays: 30 },
+    ],
+    archivedAt: null,
+    version: 0,
+    ...overrides,
+  }
+}
+
+export function aLeaveType(overrides: Partial<LeaveTypeView> = {}): LeaveTypeView {
+  return {
+    id: 'lt-annual',
+    name: 'Annual leave',
+    paid: true,
+    annualAllowance: 20,
+    archivedAt: null,
+    version: 0,
+    ...overrides,
+  }
+}
+
+export function defaultLeaveTypes(): LeaveTypeView[] {
+  return [
+    aLeaveType(),
+    aLeaveType({ id: 'lt-sick', name: 'Sick leave', annualAllowance: 10 }),
+    aLeaveType({ id: 'lt-unpaid', name: 'Unpaid leave', paid: false, annualAllowance: null }),
+  ]
+}
+
+export function aHoliday(overrides: Partial<HolidayView> = {}): HolidayView {
+  return { id: 'h-1', date: '2027-01-26', name: 'Republic Day', ...overrides }
+}
+
+export function aLeaveRequest(overrides: Partial<LeaveRequestView> = {}): LeaveRequestView {
+  return {
+    id: 'lr-1',
+    employee: MEERA_EMP,
+    type: ANNUAL,
+    startDate: '2027-03-01',
+    endDate: '2027-03-02',
+    days: 2,
+    reason: 'Family',
+    status: 'PENDING',
+    requestedBy: { id: 'u-ada', name: 'Ada Lovelace' },
+    requestedAt: '2026-10-09T09:00:00Z',
+    decidedBy: null,
+    decidedAt: null,
+    decisionNote: null,
+    cancelledAt: null,
+    version: 0,
+    ...overrides,
+  }
+}
+
+export function aLeaveBalance(overrides: Partial<LeaveBalanceView> = {}): LeaveBalanceView {
+  return {
+    type: ANNUAL,
+    paid: true,
+    entitlement: 20,
+    taken: 4,
+    pending: 2,
+    available: 14,
+    ...overrides,
+  }
+}
+
+export function anAway(overrides: Partial<AwayView> = {}): AwayView {
+  return {
+    employee: MEERA_EMP,
+    type: ANNUAL,
+    startDate: '2027-03-01',
+    endDate: '2027-03-02',
+    ...overrides,
+  }
+}
+
+export function aCourse(overrides: Partial<CourseView> = {}): CourseView {
+  return {
+    id: 'c-adv',
+    title: 'Advanced negotiation',
+    description: null,
+    durationHours: 3.5,
+    link: 'https://learn.example/neg',
+    skills: [{ skillId: 's-neg', name: 'Negotiation', level: 4 }],
+    archivedAt: null,
+    version: 0,
+    ...overrides,
+  }
+}
+
+export function aTrainingAssignment(
+  overrides: Partial<TrainingAssignmentView> = {},
+): TrainingAssignmentView {
+  return {
+    id: 'ta-1',
+    course: { id: 'c-adv', title: 'Advanced negotiation' },
+    employee: MEERA_EMP,
+    dueOn: '2027-01-31',
+    status: 'ASSIGNED',
+    overdue: false,
+    assignedBy: { id: 'u-ada', name: 'Ada Lovelace' },
+    assignedAt: '2026-10-09T09:00:00Z',
+    completedOn: null,
+    completionNote: null,
+    version: 0,
+    ...overrides,
+  }
+}
+
+export function aPolicy(overrides: Partial<PolicyView> = {}): PolicyView {
+  return {
+    id: 'pol-1',
+    title: 'Leave policy',
+    body: 'Annual leave is 20 days a year.',
+    status: 'PUBLISHED',
+    author: { id: 'u-ada', name: 'Ada Lovelace' },
+    publishedAt: '2026-10-08T09:00:00Z',
+    createdAt: '2026-10-08T08:00:00Z',
+    updatedAt: '2026-10-08T09:00:00Z',
+    version: 1,
+    ...overrides,
+  }
+}
+
+export function aPolicySummary(overrides: Partial<PolicySummary> = {}): PolicySummary {
+  return {
+    id: 'pol-1',
+    title: 'Leave policy',
+    excerpt: 'Annual leave is 20 days a year.',
+    status: 'PUBLISHED',
+    publishedAt: '2026-10-08T09:00:00Z',
+    updatedAt: '2026-10-08T09:00:00Z',
+    ...overrides,
+  }
+}
+
+export function aMe(overrides: Partial<MeView> = {}): MeView {
+  return {
+    employee: anEmployee({ user: { id: 'u-ada', name: 'Ada Lovelace' } }),
+    year: 2027,
+    balances: [aLeaveBalance()],
+    requests: [aLeaveRequest()],
+    trainings: [aTrainingAssignment()],
+    ...overrides,
+  }
+}
+
+export function anHrDashboard(overrides: Partial<HrDashboard> = {}): HrDashboard {
+  return {
+    activeHeadcount: 12,
+    byDepartment: [
+      { department: SALES, employees: 7 },
+      { department: null, employees: 5 },
+    ],
+    upcomingStarts: 2,
+    joinersLast90Days: 3,
+    leaversLast90Days: 1,
+    awayToday: [anAway()],
+    awayNext7Days: [],
+    pendingLeaveRequests: 4,
+    overdueTrainings: 1,
+    onboardingInProgress: 2,
+    topSkillGaps: [{ skill: NEGOTIATION, employees: 3 }],
     ...overrides,
   }
 }

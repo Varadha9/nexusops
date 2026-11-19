@@ -8,12 +8,15 @@ import { DirectoryPage } from '@/features/directory/DirectoryPage'
 import { PartyDetailPage } from '@/features/directory/PartyDetailPage'
 import { HelpDeskLayout } from '@/features/helpdesk/HelpDeskLayout'
 import { helpdeskChildren } from '@/features/helpdesk/routes'
+import { HrLayout } from '@/features/hrms/HrLayout'
+import { hrmsChildren } from '@/features/hrms/routes'
 import { InventoryLayout } from '@/features/inventory/InventoryLayout'
 import { inventoryChildren } from '@/features/inventory/routes'
 import { ProductDetailPage } from '@/features/products/ProductDetailPage'
 import { ProductsPage } from '@/features/products/ProductsPage'
 import { TasksPage } from '@/features/tasks/TasksPage'
 import { HelpDeskSettingsPage } from '@/features/settings/HelpDeskSettingsPage'
+import { HrSettingsPage } from '@/features/settings/HrSettingsPage'
 import { ModulesSettingsPage } from '@/features/settings/ModulesSettingsPage'
 import { PipelineSettingsPage } from '@/features/settings/PipelineSettingsPage'
 import { RoleDetailPage } from '@/features/settings/roles/RoleDetailPage'
@@ -24,23 +27,7 @@ import { WarehousesSettingsPage } from '@/features/settings/WarehousesSettingsPa
 import { WorkspaceSettingsPage } from '@/features/settings/WorkspaceSettingsPage'
 import { AppLayout } from './AppLayout'
 import { ComingSoonPage } from './ComingSoonPage'
-import { MODULE_PHASES } from './nav'
 import { OverviewPage } from './OverviewPage'
-
-function modulePage(path: string, code: string): RouteObject {
-  const info = MODULE_PHASES[code]
-  return {
-    path,
-    element: (
-      <ComingSoonPage
-        title={info.label}
-        phase={info.phase}
-        description={info.description}
-        module={code}
-      />
-    ),
-  }
-}
 
 /** /app/settings/* children (Tasks 5–8 add theirs before the catch-all, which must stay last). */
 export const settingsChildren: RouteObject[] = [
@@ -109,6 +96,14 @@ export const settingsChildren: RouteObject[] = [
     ),
   },
   {
+    path: 'hrms',
+    element: (
+      <RequirePermission anyOf={[PERMISSIONS.hrSettings]}>
+        <HrSettingsPage />
+      </RequirePermission>
+    ),
+  },
+  {
     path: '*',
     element: <EmptyState title="Settings page not found" description="Pick a section above." />,
   },
@@ -160,7 +155,7 @@ export const appChildren: RouteObject[] = [
   { path: 'crm', element: <CrmLayout />, children: crmChildren },
   { path: 'inventory', element: <InventoryLayout />, children: inventoryChildren },
   { path: 'helpdesk', element: <HelpDeskLayout />, children: helpdeskChildren },
-  modulePage('hrms', 'HRMS'),
+  { path: 'hrms', element: <HrLayout />, children: hrmsChildren },
   {
     path: 'workflows',
     element: (
