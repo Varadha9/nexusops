@@ -163,6 +163,18 @@ class TrainingApiIT extends IntegrationTestSupport {
     }
 
     @Test
+    void dueDatesOutsideTheSupportedRangeAreFieldErrors() throws Exception {
+        UUID meera = employeeWithGap(null);
+        UUID enough = course("Advanced negotiation", negotiation, 4);
+        for (String date : new String[] {"1899-12-31", "3000-01-01", "+6000000-01-01"}) {
+            owner.post("/api/v1/hr/training-assignments", "{\"courseId\":\"" + enough + "\",\"employeeId\":\""
+                    + meera + "\",\"dueOn\":\"" + date + "\"}").andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.errors[0].field").value("dueOn"))
+                    .andExpect(jsonPath("$.errors[0].message").value("Enter a date from 1900 to 2999."));
+        }
+    }
+
+    @Test
     void endingEmploymentCancelsOpenTraining() throws Exception {
         UUID meera = employeeWithGap(null);
         UUID enough = course("Advanced negotiation", negotiation, 4);

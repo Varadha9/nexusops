@@ -119,6 +119,34 @@ class LeaveApiIT extends IntegrationTestSupport {
     }
 
     @Test
+    void datesAndYearsOutsideTheSupportedRangeAreFieldErrors() throws Exception {
+        String[][] badYears = {{"2147483647"}, {"6000000"}, {"1899"}, {"3000"}};
+        for (String[] y : badYears) {
+            owner.get("/api/v1/hr/employees/" + meera + "/leave-balances?year=" + y[0]).andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.errors[0].field").value("year"))
+                    .andExpect(jsonPath("$.errors[0].message").value("Enter a year from 1900 to 2999."));
+        }
+        String[][] badRequests = {
+                {"3000-03-03", "3000-03-03", "startDate"},
+                {"+6000000-03-03", "+6000000-03-03", "startDate"},
+                {"2027-03-01", "+6000000-03-03", "endDate"},
+        };
+        for (String[] r : badRequests) {
+            ask(meera, annual, r[0], r[1]).andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.errors[0].field").value(r[2]))
+                    .andExpect(jsonPath("$.errors[0].message").value("Enter a date from 1900 to 2999."));
+        }
+        owner.get("/api/v1/hr/leave-requests?from=3000-01-01").andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errors[0].field").value("from"));
+        owner.get("/api/v1/hr/leave-requests?to=1899-12-31").andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errors[0].field").value("to"));
+        owner.get("/api/v1/hr/leave/away?from=3000-01-01").andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errors[0].field").value("from"));
+        owner.get("/api/v1/hr/leave/away?from=2027-01-01&to=%2B6000000-01-01").andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errors[0].field").value("to"));
+    }
+
+    @Test
     void overlappingRequestsAreRefusedButRejectedOrCancelledOnesDontCount() throws Exception {
         UUID first = Api.id(ask(meera, annual, "2027-03-01", "2027-03-05").andExpect(status().isCreated()));
         ask(meera, unpaid, "2027-03-05", "2027-03-08").andExpect(status().isConflict())

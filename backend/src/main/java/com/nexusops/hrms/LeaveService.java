@@ -90,6 +90,8 @@ public class LeaveService {
     @Transactional(readOnly = true)
     public PageResponse<LeaveRequestView> list(LeaveQuery q, Integer page, Integer size) {
         TenantContext.requireTenantId();
+        HrDates.check(q.from(), "from");
+        HrDates.check(q.to(), "to");
         Specification<LeaveRequest> spec = (root, cq, cb) -> cb.and(Stream.of(
                 q.status() == null ? null : cb.equal(root.get("status"), q.status()),
                 q.employeeId() == null ? null : cb.equal(root.get("employeeId"), q.employeeId()),
@@ -153,6 +155,8 @@ public class LeaveService {
     @Transactional(readOnly = true)
     public List<AwayView> away(LocalDate from, LocalDate to) {
         TenantContext.requireTenantId();
+        HrDates.check(from, "from");
+        HrDates.check(to, "to");
         LocalDate start = from == null ? clock.today() : from;
         LocalDate end = to == null ? start : to;
         List<LeaveRequest> found = requests.approvedBetween(start, end);
@@ -165,7 +169,8 @@ public class LeaveService {
 
     @Transactional(readOnly = true)
     public List<LeaveBalanceView> balances(UUID employeeId, Integer year) {
-        return balancesFor(employees.find(employeeId), year == null ? clock.today().getYear() : year);
+        int y = year == null ? clock.today().getYear() : HrDates.year(year, "year");
+        return balancesFor(employees.find(employeeId), y);
     }
 
     List<LeaveBalanceView> balancesFor(Employee employee, int year) {
@@ -227,6 +232,8 @@ public class LeaveService {
         if (c.endDate() == null) {
             throw ApiProblem.badRequestField("endDate", "Enter the last day of leave.");
         }
+        HrDates.check(c.startDate(), "startDate");
+        HrDates.check(c.endDate(), "endDate");
         if (c.endDate().isBefore(c.startDate())) {
             throw ApiProblem.badRequestField("endDate", END_BEFORE_START);
         }

@@ -196,6 +196,23 @@ class EmployeeApiIT extends IntegrationTestSupport {
     }
 
     @Test
+    void employmentDatesOutsideTheSupportedRangeAreFieldErrors() throws Exception {
+        for (String date : new String[] {"1899-12-31", "3000-01-01", "+6000000-01-01"}) {
+            owner.post("/api/v1/hr/employees", "{\"person\":{\"firstName\":\"Far\",\"lastName\":\"Away\"},"
+                    + "\"employeeNumber\":\"F-1\",\"startDate\":\"" + date + "\"}").andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.errors[0].field").value("startDate"))
+                    .andExpect(jsonPath("$.errors[0].message").value("Enter a date from 1900 to 2999."));
+        }
+        UUID id = TestHr.hire(owner, "Dev", "Patel", "E-9");
+        owner.put("/api/v1/hr/employees/" + id, "{\"employeeNumber\":\"E-9\",\"startDate\":\"3000-01-01\","
+                + "\"version\":0}").andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errors[0].field").value("startDate"));
+        owner.post("/api/v1/hr/employees/" + id + "/end", "{\"endDate\":\"+6000000-01-01\",\"version\":0}")
+                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.errors[0].field").value("endDate"))
+                .andExpect(jsonPath("$.errors[0].message").value("Enter a date from 1900 to 2999."));
+    }
+
+    @Test
     void listsAndFilters() throws Exception {
         UUID meera = Api.id(owner.post("/api/v1/hr/employees", "{\"person\":{\"firstName\":\"Meera\",\"lastName\":\"Iyer\"},"
                 + "\"employeeNumber\":\"S-1\",\"departmentId\":\"" + sales + "\",\"jobRoleId\":\"" + executive

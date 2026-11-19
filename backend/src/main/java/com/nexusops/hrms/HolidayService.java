@@ -41,10 +41,7 @@ public class HolidayService {
     @Transactional(readOnly = true)
     public List<HolidayView> list(Integer year) {
         TenantContext.requireTenantId();
-        int y = year == null ? clock.today().getYear() : year;
-        if (y < 1 || y > 9999) {
-            throw ApiProblem.badRequestField("year", "Enter a year.");
-        }
+        int y = year == null ? clock.today().getYear() : HrDates.year(year, "year");
         return holidays.findByDateBetweenOrderByDateAsc(LocalDate.of(y, 1, 1), LocalDate.of(y, 12, 31)).stream()
                 .map(HolidayService::view).toList();
     }
@@ -55,6 +52,7 @@ public class HolidayService {
         if (date == null) {
             throw ApiProblem.badRequestField("date", "Enter a date.");
         }
+        HrDates.check(date, "date");
         String name = HrRecords.collapse(Text.required(rawName, 80, "name"));
         locks.lock(LOCK);
         if (holidays.existsByDate(date)) {

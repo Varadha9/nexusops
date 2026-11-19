@@ -85,6 +85,7 @@ public class TrainingService {
 
     @Transactional
     public TrainingAssignmentView assign(UUID courseId, UUID employeeId, LocalDate dueOn) {
+        HrDates.check(dueOn, "dueOn");
         Course course = courses.resolve(courseId, "courseId");
         Employee employee = employees.resolve(employeeId, "employeeId");
         locks.lock(EmployeeService.trainingLock(employee.getId()));

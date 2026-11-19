@@ -83,6 +83,19 @@ class LeaveSettingsApiIT extends IntegrationTestSupport {
     }
 
     @Test
+    void holidayDatesAndYearsOutsideTheSupportedRangeAreFieldErrors() throws Exception {
+        owner.post("/api/v1/hr/holidays", "{\"date\":\"3000-01-01\",\"name\":\"Far away\"}")
+                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.errors[0].field").value("date"))
+                .andExpect(jsonPath("$.errors[0].message").value("Enter a date from 1900 to 2999."));
+        owner.post("/api/v1/hr/holidays", "{\"date\":\"+6000000-01-01\",\"name\":\"Far away\"}")
+                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.errors[0].field").value("date"));
+        for (String year : new String[] {"1899", "3000", "2147483647"}) {
+            owner.get("/api/v1/hr/holidays?year=" + year).andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.errors[0].field").value("year"));
+        }
+    }
+
+    @Test
     void selfServiceUsersSeeLeaveTypesAndHolidaysButCantChangeThem() throws Exception {
         UUID role = TestRoles.create(mvc, owner.session(), "Staff", "hr.self.service");
         Api staff = Api.login(mvc, members.create(ws.tenantId(), Set.of(role)));

@@ -429,7 +429,7 @@ public class EmployeeService {
         if (value == null) {
             throw ApiProblem.badRequestField(field, message);
         }
-        return value;
+        return HrDates.check(value, field);
     }
 
     // ---- views ----
