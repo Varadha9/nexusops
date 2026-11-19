@@ -15,6 +15,7 @@ import {
 import { describedBy, Field } from '@/components/form/Field'
 import { FormError } from '@/components/form/FormError'
 import { useApi } from '@/lib/api/ApiContext'
+import { ApiError } from '@/lib/api/client'
 import { problemMessage } from '@/lib/api/problems'
 import type { EmployeeView } from '@/lib/api/types'
 import { employeeKey } from './EmployeeFormDialog'
@@ -56,7 +57,12 @@ export function EndEmploymentDialog({
       toast.success('Employment ended.')
       onClose()
     } catch (error) {
-      setFormError(problemMessage(error))
+      const onDate =
+        error instanceof ApiError
+          ? error.problem.errors?.find((e) => e.field === 'endDate')?.message
+          : undefined
+      if (onDate) setDateError(onDate)
+      else setFormError(problemMessage(error))
       void queryClient.invalidateQueries({ queryKey: employeeKey(employee.id) })
     } finally {
       setBusy(false)

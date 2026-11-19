@@ -77,6 +77,8 @@ function StartOnboarding({ employee }: { employee: EmployeeView }) {
       toast.success('Onboarding started.')
     } catch (e) {
       setError(problemMessage(e))
+      // e.g. someone else started it meanwhile: show the record as it is now
+      void queryClient.invalidateQueries({ queryKey: employeeKey(employee.id) })
     } finally {
       setBusy(false)
     }

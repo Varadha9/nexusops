@@ -153,6 +153,51 @@ describe('EmployeeDetailPage', () => {
     )
   })
 
+  it('shows a server error on the last day under that field', async () => {
+    const { server, user } = setup()
+    await screen.findByRole('heading', { name: 'Meera Iyer · E-1' })
+    server.on('POST /hr/employees/:id/end', {
+      status: 400,
+      body: {
+        detail: 'Request validation failed.',
+        errors: [{ field: 'endDate', message: "The end date can't be before the start date." }],
+      },
+    })
+    await user.click(screen.getByRole('button', { name: 'End employment' }))
+    const dialog = await screen.findByRole('dialog')
+    await user.type(within(dialog).getByLabelText('Last day'), '2025-12-31')
+    await user.click(within(dialog).getByRole('button', { name: 'End employment' }))
+    const lastDay = within(dialog).getByLabelText('Last day')
+    await waitFor(() => expect(lastDay).toHaveAttribute('aria-invalid', 'true'))
+    expect(lastDay).toHaveAccessibleDescription("The end date can't be before the start date.")
+  })
+
+  it('refreshes the employee when starting onboarding is refused', async () => {
+    const { server, user } = setup()
+    const onboarding = await screen.findByRole('region', { name: 'Onboarding' })
+    await within(onboarding).findByRole('option', { name: 'Standard onboarding' })
+    // someone else started it meanwhile
+    server
+      .on('POST /hr/employees/:id/onboarding', {
+        status: 409,
+        body: { detail: 'Onboarding has already started for this employee.' },
+      })
+      .on('GET /hr/employees/:id', {
+        body: anEmployee({
+          onboarding: {
+            templateId: 'ot-std',
+            templateName: 'Standard onboarding',
+            done: 1,
+            total: 2,
+          },
+          version: 1,
+        }),
+      })
+    await user.selectOptions(within(onboarding).getByLabelText('Template'), 'ot-std')
+    await user.click(within(onboarding).getByRole('button', { name: 'Start onboarding' }))
+    expect(await within(onboarding).findByText('1 of 2 tasks done')).toBeInTheDocument()
+  })
+
   it('starts onboarding from a template and then shows progress', async () => {
     const { server, user } = setup()
     const onboarding = await screen.findByRole('region', { name: 'Onboarding' })
