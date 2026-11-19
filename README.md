@@ -107,6 +107,8 @@ Switch the module on under **Settings → Modules**; every HRMS permission switc
 - **Job roles** list the skills they need (levels 1–5). Every employee page shows their **skill gaps** and recommends
   courses that teach enough; completing a course raises the skill.
 - **Onboarding** templates (a "Standard onboarding" is ready) turn into tasks for HR, the manager and the new hire.
+  For new hires to tick off their own items, their role needs task read (`collaboration.task.read`) as well as
+  `hr.self.service`; otherwise their manager or HR ticks them off.
 - **Leave** is counted in working days (weekends and the workspace's public holidays don't count) against yearly
   balances; HR can adjust a balance. Employees ask for leave under **My HR**; their manager is emailed, approvers decide
   under **HRMS → Leave**, and the employee is emailed. Nobody decides their own request.

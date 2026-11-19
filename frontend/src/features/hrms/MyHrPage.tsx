@@ -3,14 +3,20 @@ import { useState } from 'react'
 import { Link } from 'react-router'
 import { toast } from 'sonner'
 import { ConfirmDialog } from '@/components/ConfirmDialog'
-import { FormError } from '@/components/form/FormError'
 import { ErrorState, ListSkeleton, PageHeader } from '@/components/states'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { PERMISSIONS, useCan } from '@/features/auth/permissions'
 import { useApi } from '@/lib/api/ApiContext'
 import { ApiError } from '@/lib/api/client'
 import { problemMessage } from '@/lib/api/problems'
-import type { LeaveRequestView, MeView, Page, PolicySummary } from '@/lib/api/types'
+import type {
+  LeaveRequestView,
+  MeView,
+  Page,
+  PolicySummary,
+  TrainingAssignmentView,
+} from '@/lib/api/types'
 import { formatDate, todayIso } from '@/lib/format'
 import { toQuery } from '@/lib/query'
 import { invalidateHr } from './invalidation'
@@ -20,6 +26,7 @@ import { LeaveRequestDialog } from './LeaveRequestDialog'
 /** Self-service: my leave, my training, my onboarding and the policies. */
 export function MyHrPage() {
   const api = useApi()
+  const can = useCan()
   const me = useQuery({
     queryKey: ['hr', 'me'],
     queryFn: () => api.get<MeView>('/hr/me'),
@@ -64,12 +71,18 @@ export function MyHrPage() {
             <p className="text-sm">
               {employee.onboarding.done} of {employee.onboarding.total} tasks done
             </p>
-            <Link
-              to="/app/tasks?assignee=me"
-              className="text-sm underline-offset-4 hover:underline"
-            >
-              See my tasks
-            </Link>
+            {can(PERMISSIONS.taskRead) ? (
+              <Link
+                to="/app/tasks?assignee=me"
+                className="text-sm underline-offset-4 hover:underline"
+              >
+                See my tasks
+              </Link>
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                Your manager or HR will tick these off.
+              </p>
+            )}
           </section>
         )}
         <Policies />
@@ -187,15 +200,20 @@ function MyTraining({ me }: { me: MeView }) {
   const queryClient = useQueryClient()
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [completing, setCompleting] = useState<TrainingAssignmentView | null>(null)
   const open = me.trainings.filter((t) => t.status === 'ASSIGNED')
 
-  async function complete(id: string, version: number) {
+  async function complete(training: TrainingAssignmentView) {
     setBusy(true)
     setError(null)
     try {
-      await api.post(`/hr/me/training/${id}/complete`, { note: null, version })
+      await api.post(`/hr/me/training/${training.id}/complete`, {
+        note: null,
+        version: training.version,
+      })
       await invalidateHr(queryClient)
       toast.success('Training completed.')
+      setCompleting(null)
     } catch (e) {
       setError(problemMessage(e))
       void invalidateHr(queryClient)
@@ -207,7 +225,6 @@ function MyTraining({ me }: { me: MeView }) {
   return (
     <section aria-label="My training" className="space-y-3">
       <h2 className="text-base font-semibold">My training</h2>
-      <FormError message={error} />
       {open.length === 0 ? (
         <p className="text-sm text-muted-foreground">No training assigned.</p>
       ) : (
@@ -222,7 +239,10 @@ function MyTraining({ me }: { me: MeView }) {
                   size="sm"
                   disabled={busy}
                   aria-label={`Mark ${t.course.title} complete`}
-                  onClick={() => void complete(t.id, t.version)}
+                  onClick={() => {
+                    setError(null)
+                    setCompleting(t)
+                  }}
                 >
                   Mark complete
                 </Button>
@@ -231,6 +251,16 @@ function MyTraining({ me }: { me: MeView }) {
           ))}
         </ul>
       )}
+      <ConfirmDialog
+        open={completing !== null}
+        title={completing ? `Mark ${completing.course.title} complete?` : ''}
+        description="This raises your skills and can't be undone."
+        confirmLabel="Mark complete"
+        busy={busy}
+        error={error}
+        onCancel={() => setCompleting(null)}
+        onConfirm={() => completing && void complete(completing)}
+      />
     </section>
   )
 }

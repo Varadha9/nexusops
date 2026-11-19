@@ -5,6 +5,7 @@ import { signedIn, testProfile } from '@/test/fixtures'
 import {
   aLeaveRequest,
   aMe,
+  anEmployee,
   aPolicySummary,
   aTrainingAssignment,
   defaultLeaveTypes,
@@ -12,9 +13,9 @@ import {
 } from '@/test/records'
 import { renderApp } from '@/test/renderApp'
 
-function setup(me = aMe()) {
+function setup(me = aMe(), permissions = ['hr.self.service']) {
   const server = fakeServer()
-  signedIn(server, testProfile({ modules: ['HRMS'], permissions: ['hr.self.service'] }))
+  signedIn(server, testProfile({ modules: ['HRMS'], permissions }))
     .on('GET /hr/me', { body: me })
     .on('GET /hr/leave-types', { body: defaultLeaveTypes() })
     .on('GET /hr/policies', { body: pageOf([aPolicySummary()]) })
@@ -77,6 +78,9 @@ describe('MyHrPage', () => {
         version: 0,
       }),
     )
+    // wait for the refetch to show the cancelled request before replacing the GET reply
+    const requests = screen.getByRole('list', { name: 'My requests' })
+    expect(await within(requests).findByText('Cancelled')).toBeInTheDocument()
     const complete = await screen.findByRole('button', {
       name: 'Mark Advanced negotiation complete',
     })
@@ -86,11 +90,51 @@ describe('MyHrPage', () => {
       })
       .on('GET /hr/me', { body: aMe({ trainings: [] }) })
     await user.click(complete)
+    // completing can't be undone: it asks first
+    const confirm = await screen.findByRole('dialog')
+    expect(confirm).toHaveTextContent("This raises your skills and can't be undone.")
+    expect(server.callsTo('POST /hr/me/training/:id/complete')).toHaveLength(0)
+    await user.click(within(confirm).getByRole('button', { name: 'Mark complete' }))
     await waitFor(() =>
       expect(server.callsTo('POST /hr/me/training/:id/complete')[0]?.body).toEqual({
         note: null,
         version: 0,
       }),
+    )
+    const trainings = screen.getByRole('region', { name: 'My training' })
+    expect(await within(trainings).findByText('No training assigned.')).toBeInTheDocument()
+  })
+
+  it('keeps a training open when the confirmation is dismissed', async () => {
+    const { server, user } = setup()
+    await user.click(
+      await screen.findByRole('button', { name: 'Mark Advanced negotiation complete' }),
+    )
+    await user.click(
+      within(await screen.findByRole('dialog')).getByRole('button', { name: 'Cancel' }),
+    )
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+    expect(server.callsTo('POST /hr/me/training/:id/complete')).toHaveLength(0)
+  })
+
+  it('links my onboarding tasks only when I can open tasks', async () => {
+    const onboarding = aMe({
+      employee: anEmployee({
+        user: { id: 'u-ada', name: 'Ada Lovelace' },
+        onboarding: { templateId: 'ot-1', templateName: 'Standard onboarding', done: 1, total: 3 },
+      }),
+    })
+    const { unmount } = setup(onboarding)
+    const section = await screen.findByRole('region', { name: 'My onboarding' })
+    expect(section).toHaveTextContent('1 of 3 tasks done')
+    expect(within(section).queryByRole('link', { name: 'See my tasks' })).not.toBeInTheDocument()
+    expect(section).toHaveTextContent('Your manager or HR will tick these off.')
+    unmount()
+    setup(onboarding, ['hr.self.service', 'collaboration.task.read'])
+    const withTasks = await screen.findByRole('region', { name: 'My onboarding' })
+    expect(within(withTasks).getByRole('link', { name: 'See my tasks' })).toHaveAttribute(
+      'href',
+      '/app/tasks?assignee=me',
     )
   })
 
