@@ -9,6 +9,7 @@ import com.nexusops.identity.Members;
 import com.nexusops.shared.Ids;
 import com.nexusops.shared.TenantContext;
 import com.nexusops.shared.Text;
+import com.nexusops.shared.knowledge.KnowledgeChanged;
 import com.nexusops.shared.security.CurrentAuthorities;
 import com.nexusops.shared.web.ApiProblem;
 import com.nexusops.shared.web.PageResponse;
@@ -21,6 +22,7 @@ import java.util.Objects;
 import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -37,12 +39,15 @@ public class PolicyService {
     private final HrQueries queries;
     private final Members members;
     private final AuditService audit;
+    private final ApplicationEventPublisher events;
 
-    PolicyService(HrPolicyRepository policies, HrQueries queries, Members members, AuditService audit) {
+    PolicyService(HrPolicyRepository policies, HrQueries queries, Members members, AuditService audit,
+            ApplicationEventPublisher events) {
         this.policies = policies;
         this.queries = queries;
         this.members = members;
         this.audit = audit;
+        this.events = events;
     }
 
     @Transactional(readOnly = true)
@@ -87,6 +92,7 @@ public class PolicyService {
         policy.apply(f.title(), f.body());
         policies.flush();
         audit.record(AuditEntry.of("PolicyUpdated", "HrPolicy", id).withBefore(before).withAfter(snapshot(policy)));
+        knowledgeChanged(id);
         return view(policy);
     }
 
@@ -100,6 +106,7 @@ public class PolicyService {
             policies.flush();
             audit.record(AuditEntry.of("PolicyPublished", "HrPolicy", id).withAfter(Map.of("title", policy.getTitle())));
         }
+        knowledgeChanged(id);
         return view(policy);
     }
 
@@ -113,6 +120,7 @@ public class PolicyService {
             policies.flush();
             audit.record(AuditEntry.of("PolicyUnpublished", "HrPolicy", id).withAfter(Map.of("title", policy.getTitle())));
         }
+        knowledgeChanged(id);
         return view(policy);
     }
 
@@ -126,7 +134,13 @@ public class PolicyService {
             policies.flush();
             audit.record(AuditEntry.of("PolicyArchived", "HrPolicy", id).withBefore(before).withAfter(snapshot(policy)));
         }
+        knowledgeChanged(id);
         return view(policy);
+    }
+
+    /** The AI index drops this document's chunks in this transaction and re-embeds it after commit (D3). */
+    private void knowledgeChanged(UUID id) {
+        events.publishEvent(new KnowledgeChanged(PolicyKnowledge.SOURCE_TYPE, id));
     }
 
     /** Summaries in the order of {@code ids} (search ranking). */

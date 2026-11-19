@@ -30,7 +30,8 @@ class RlsCoverageIT extends IntegrationTestSupport {
             "departments", "skills", "job_roles", "job_role_skills", "employees", "employee_skills",
             "onboarding_templates", "onboarding_template_items", "employee_onboardings",
             "employee_onboarding_tasks", "leave_types", "holidays", "leave_requests", "leave_adjustments",
-            "courses", "course_skills", "training_assignments", "hr_policies");
+            "courses", "course_skills", "training_assignments", "hr_policies", "ai_chunks", "ai_settings",
+            "ai_requests");
 
     @Autowired JdbcTemplate jdbc;
 

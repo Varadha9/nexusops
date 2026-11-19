@@ -12,4 +12,10 @@ public class TestBeans {
     RecordingMailSender recordingMailSender() {
         return new RecordingMailSender();
     }
+
+    @Bean
+    @Primary
+    FakeAiClient fakeAiClient() {
+        return new FakeAiClient();
+    }
 }
