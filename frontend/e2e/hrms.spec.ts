@@ -180,7 +180,9 @@ test('a new hire is onboarded, closes a skill gap with training, and takes appro
   await hrTab(page, 'Overview').click()
   const people = page.getByRole('region', { name: 'People' })
   // Ada and Zoe: the headcount figure itself, not any "2" in the region
-  await expect(people).toContainText(/Active employees: 2(?!\d)/)
+  await expect(people.locator('p').filter({ hasText: 'Active employees:' })).toHaveText(
+    'Active employees: 2',
+  )
   await expect(page.getByRole('region', { name: 'Needs attention' })).toContainText(
     'Overdue trainings: 0',
   )
