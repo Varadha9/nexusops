@@ -1,4 +1,5 @@
 import type {
+  AiSettingsView,
   ActivityView,
   BoardView,
   CustomerRow,
@@ -946,6 +947,18 @@ export function anHrDashboard(overrides: Partial<HrDashboard> = {}): HrDashboard
     overdueTrainings: 1,
     onboardingInProgress: 2,
     topSkillGaps: [{ skill: NEGOTIATION, employees: 3 }],
+    ...overrides,
+  }
+}
+
+export function anAiSettings(overrides: Partial<AiSettingsView> = {}): AiSettingsView {
+  return {
+    enabled: true,
+    monthlyLimit: 500,
+    usedThisMonth: 12,
+    provider: 'LOCAL',
+    indexedChunks: 42,
+    version: 3,
     ...overrides,
   }
 }

@@ -6,6 +6,7 @@ import { ConfirmDialog } from '@/components/ConfirmDialog'
 import { ErrorState, ListSkeleton, PageHeader } from '@/components/states'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { PolicyAssistantCard } from '@/features/ai/PolicyAssistantCard'
 import { PERMISSIONS, useCan } from '@/features/auth/permissions'
 import { useApi } from '@/lib/api/ApiContext'
 import { ApiError } from '@/lib/api/client'
@@ -85,6 +86,7 @@ export function MyHrPage() {
             )}
           </section>
         )}
+        <PolicyAssistantCard />
         <Policies />
       </div>
     </>
