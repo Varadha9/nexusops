@@ -80,12 +80,14 @@ function WaitingForDecision() {
     request: LeaveRequestView
     outcome: 'approve' | 'reject'
   } | null>(null)
+  const [page, setPage] = useState(0)
   const pending = useQuery({
-    queryKey: ['hr', 'leave-requests', { status: 'PENDING' }],
+    queryKey: ['hr', 'leave-requests', { status: 'PENDING', page }],
     queryFn: () =>
       api.get<Page<LeaveRequestView>>(
-        `/hr/leave-requests?${toQuery({ status: 'PENDING', size: 50 })}`,
+        `/hr/leave-requests?${toQuery({ status: 'PENDING', page, size: SIZE })}`,
       ),
+    placeholderData: keepPreviousData,
   })
   return (
     <section aria-label="Waiting for a decision" className="space-y-3">
@@ -94,59 +96,79 @@ function WaitingForDecision() {
         <ListSkeleton rows={3} />
       ) : pending.isError ? (
         <ErrorState error={pending.error} onRetry={() => void pending.refetch()} />
-      ) : pending.data.items.length === 0 ? (
+      ) : pending.data.items.length === 0 && page === 0 ? (
         <p className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">
           Nothing is waiting for a decision.
         </p>
+      ) : pending.data.items.length === 0 ? (
+        <>
+          <p className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">
+            Nothing more on this page.
+          </p>
+          <Pagination
+            page={pending.data.page}
+            size={pending.data.size}
+            total={pending.data.total}
+            onPage={setPage}
+          />
+        </>
       ) : (
-        <div className="overflow-x-auto rounded-lg border">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Employee</TableHead>
-                <TableHead>Type</TableHead>
-                <TableHead>Dates</TableHead>
-                <TableHead>Days</TableHead>
-                <TableHead>Reason</TableHead>
-                <TableHead>Requested</TableHead>
-                <TableHead>
-                  <span className="sr-only">Decide</span>
-                </TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {pending.data.items.map((r) => (
-                <TableRow key={r.id}>
-                  <TableCell>{employeeLink(r)}</TableCell>
-                  <TableCell>{r.type.name}</TableCell>
-                  <TableCell>
-                    {formatDate(r.startDate)} – {formatDate(r.endDate)}
-                  </TableCell>
-                  <TableCell>{formatDays(r.days)}</TableCell>
-                  <TableCell>{r.reason ?? '—'}</TableCell>
-                  <TableCell>{formatDateTime(r.requestedAt)}</TableCell>
-                  <TableCell className="space-x-2 whitespace-nowrap">
-                    <Button
-                      size="sm"
-                      aria-label={`Approve ${r.employee.name} ${r.startDate}`}
-                      onClick={() => setDeciding({ request: r, outcome: 'approve' })}
-                    >
-                      Approve
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      aria-label={`Reject ${r.employee.name} ${r.startDate}`}
-                      onClick={() => setDeciding({ request: r, outcome: 'reject' })}
-                    >
-                      Reject
-                    </Button>
-                  </TableCell>
+        <>
+          <div className="overflow-x-auto rounded-lg border">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Employee</TableHead>
+                  <TableHead>Type</TableHead>
+                  <TableHead>Dates</TableHead>
+                  <TableHead>Days</TableHead>
+                  <TableHead>Reason</TableHead>
+                  <TableHead>Requested</TableHead>
+                  <TableHead>
+                    <span className="sr-only">Decide</span>
+                  </TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
+              </TableHeader>
+              <TableBody>
+                {pending.data.items.map((r) => (
+                  <TableRow key={r.id}>
+                    <TableCell>{employeeLink(r)}</TableCell>
+                    <TableCell>{r.type.name}</TableCell>
+                    <TableCell>
+                      {formatDate(r.startDate)} – {formatDate(r.endDate)}
+                    </TableCell>
+                    <TableCell>{formatDays(r.days)}</TableCell>
+                    <TableCell>{r.reason ?? '—'}</TableCell>
+                    <TableCell>{formatDateTime(r.requestedAt)}</TableCell>
+                    <TableCell className="space-x-2 whitespace-nowrap">
+                      <Button
+                        size="sm"
+                        aria-label={`Approve ${r.employee.name} ${r.startDate}`}
+                        onClick={() => setDeciding({ request: r, outcome: 'approve' })}
+                      >
+                        Approve
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        aria-label={`Reject ${r.employee.name} ${r.startDate}`}
+                        onClick={() => setDeciding({ request: r, outcome: 'reject' })}
+                      >
+                        Reject
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+          <Pagination
+            page={pending.data.page}
+            size={pending.data.size}
+            total={pending.data.total}
+            onPage={setPage}
+          />
+        </>
       )}
       {deciding && (
         <DecisionDialog
@@ -341,7 +363,9 @@ function WhoIsAway() {
           <Input id="away-to" type="date" value={to} onChange={(e) => setTo(e.target.value)} />
         </div>
       </div>
-      {to < from ? (
+      {!from || !to ? (
+        <p className="text-sm text-muted-foreground">Choose both dates.</p>
+      ) : to < from ? (
         <p className="text-sm text-muted-foreground">
           The end date can't be before the start date.
         </p>
