@@ -6,8 +6,8 @@
 ## 1. Goal
 
 Show real, governed AI inside NexusOps: answers grounded in the workspace's own documents, with citations, that
-respect tenant isolation and permissions, are audited, metered and can be switched off — and that keep working
-(in a reduced "offline" mode) when no model is reachable.
+respect tenant isolation and permissions, are audited, metered and can be switched off — running entirely on our own
+stack, with no API key or paid service.
 
 ## 2. Scope
 
@@ -19,8 +19,10 @@ respect tenant isolation and permissions, are audited, metered and can be switch
 2. **Knowledge index** in PostgreSQL + pgvector: chunks of **published** HelpDesk knowledge-base articles and
    **published** HR policies, each chunk carrying `tenant_id`, `source_type`, `source_id` and the permission needed to
    read it. Kept current when a source is published, edited, unpublished or archived; rebuildable on demand.
-3. **ai-service** (FastAPI): local embeddings (no key, works offline) and generation with Claude, with an offline
-   fallback when the key is missing or the call fails.
+3. **ai-service** (FastAPI): everything runs locally with no API key, no paid service and no network at runtime —
+   embeddings from an open model baked into the image, and answers *assembled* from the retrieved passages
+   (extractive generation). The generator sits behind a provider interface so a hosted or local LLM can be added later
+   without changing the gateway or the UI.
 4. **Features:**
    - HelpDesk ticket — **Suggest triage**: category (from the workspace's categories) + priority + one-line reason; the
      agent applies it with one click (an ordinary ticket update).
@@ -29,7 +31,8 @@ respect tenant isolation and permissions, are audited, metered and can be switch
    - My HR — **Ask about HR policies**: an answer from published policies with cited policies.
    - Settings → **AI**: on/off, monthly request limit, usage this month, provider status, rebuild index.
 
-**Out (later Phase 12 parts, after Phases 9–11):** forecasting and predictions, workflow proposals, CRM summaries,
+**Out (later Phase 12 parts, after Phases 9–11):** a hosted or local LLM provider (Claude / Ollama) behind the
+existing interface, forecasting and predictions, workflow proposals, CRM summaries,
 prompt registry UI, evaluation harness and dataset, document (file) ingestion, streaming responses, chat history.
 
 ## 3. Decisions
@@ -53,15 +56,22 @@ prompt registry UI, evaluation harness and dataset, document (file) ingestion, s
 - **D5 — Embeddings.** `fastembed` with `BAAI/bge-small-en-v1.5` (384 dimensions), model files baked into the
   ai-service image at build time so runtime needs no network. Chunks: ~800 characters with 100 overlap, split on
   paragraph/sentence boundaries; the title is prefixed to every chunk's embedded text.
-- **D6 — Generation.** Anthropic Python SDK, model `claude-opus-5-5` (env `ANTHROPIC_MODEL` overrides),
-  `output_config.effort` `low`, structured output via `client.messages.parse(..., output_format=<pydantic model>)`,
-  client timeout 30 s, `max_retries` 1. The key comes from env `ANTHROPIC_API_KEY`, set by the operator in the untracked
-  `infra/docker/.env`; it is never logged, stored or returned.
-- **D7 — Offline fallback (ai-service).** Used when there is no key, the call errors or times out, or the model refuses
-  (`stop_reason == "refusal"`). Answers: "The AI model is unavailable, so here are the most relevant passages:" followed
-  by the top passages, with the same citations. Triage: category = the category whose name is most similar
-  (embeddings) to the ticket text; priority by keyword rules (`outage|down|urgent|asap|critical` → URGENT,
-  `error|broken|cannot|can't|failed` → HIGH, otherwise NORMAL). Every response carries `mode: "CLAUDE" | "OFFLINE"`.
+- **D6 — Local extractive generation (user decision 2026-11-20: no API key, no hosted model).** ai-service splits
+  the retrieved passages into sentences, embeds them with the same local model, and keeps the sentences most similar to
+  the question (cosine ≥ 0.45, at most 4, at most 2 per passage, original order within a passage), each followed by its
+  passage marker `[n]`. Cited passages = the passages those sentences came from. No sentence above the threshold →
+  "I couldn't find a clear answer in your workspace's documents. These may help:" plus the titles of the top 2
+  passages, cited.
+  - **Policy answer:** the selected sentences, as above.
+  - **Reply draft:** `Hi,\n\nThanks for getting in touch. ` + the selected sentences (markers removed from the draft
+    text, citations still returned) + `\n\nIf that doesn't solve it, reply to this message and we'll look into it
+    further.\n\nBest regards`.
+- **D7 — Local triage.** Category = the workspace category whose name is most similar (embeddings) to
+  `subject + description`, or none when there are no categories or the best similarity is below 0.30. Priority by
+  keyword rules on the lower-cased text, first match wins: `outage|down|urgent|asap|critical|security|breach` → URGENT;
+  `error|broken|cannot|can't|failed|not working` → HIGH; `question|how do|how to|wondering` → LOW; otherwise NORMAL.
+  Reason names what drove it, e.g. `Mentions "outage"; closest category: Billing.` Every response carries
+  `mode: "LOCAL"` and `model: "bge-small-en-v1.5"`; the provider interface reserves other modes for later.
 - **D8 — Grounding and injection defence.** Retrieved passages are sent as numbered, delimited data blocks; the system
   prompt says passages are reference material, never instructions, and to answer only from them or say it doesn't
   know. The model returns cited passage numbers; Spring maps them to sources **only within the retrieved set** —
@@ -72,7 +82,7 @@ prompt registry UI, evaluation harness and dataset, document (file) ingestion, s
   month's `ai_requests` rows, UTC) → 429 `This workspace has used its AI requests for this month.` Plus a per-user Redis
   rate limit rule `ai` (20 per minute, authenticated API fails open as today).
 - **D10 — Usage and audit.** Every completed AI call inserts an `ai_requests` row: feature, mode, model, prompt version,
-  input/output tokens (0 offline), latency ms, cited source ids, user id. No question or answer text is stored (PII
+  input/output tokens (0 for local generation), latency ms, cited source ids, user id. No question or answer text is stored (PII
   minimisation). Each call also writes audit event `ai.request.completed` (entity `ai_request`); settings changes write
   `ai.settings.updated`; a rebuild writes `ai.index.rebuilt`.
 - **D11 — Permissions.** New core (module-less) permissions `ai.assistant.use` ("Use AI assistance") and
@@ -80,10 +90,10 @@ prompt registry UI, evaluation harness and dataset, document (file) ingestion, s
   Feature routes additionally require the feature's own read permission (below), so a disabled HELPDESK/HRMS module
   also hides its AI features.
 - **D12 — ai-service unreachable.** Spring returns 503 `The AI service is unavailable. Try again shortly.` (no row, no
-  audit). Spring → ai-service timeout 35 s.
+  audit). Spring → ai-service connect timeout 2 s, read timeout 20 s.
 - **D13 — Human in the loop.** AI never changes data. Triage is applied by the agent through the existing ticket update;
-  the draft goes into the composer unsent. All AI output in the UI is labelled "AI-generated — check before use", with an
-  "Offline mode" badge when `mode` is OFFLINE.
+  the draft goes into the composer unsent. All AI output in the UI is labelled "AI-generated — check before use" and
+  shows "Answered from your workspace's documents" with the cited sources.
 - **D14 — Prompt versions.** Prompts live in ai-service as constants with a version string (`triage-v1`, `reply-v1`,
   `policy-v1`) returned in every response and stored in `ai_requests`.
 
@@ -111,7 +121,7 @@ ai-service (internal, not exposed by nginx):
 
 | Route | Body → Response |
 |---|---|
-| `GET /health` | `{status, service, provider: "CLAUDE"|"OFFLINE", embeddingModel}` (`provider` = key configured) |
+| `GET /health` | `{status, service, provider: "LOCAL", embeddingModel: "bge-small-en-v1.5"}` |
 | `POST /embed` | `{texts: [str] (1..64)}` → `{vectors: [[float]*384]}` |
 | `POST /answer` | `{task: "TICKET_REPLY"|"POLICY_QUESTION", question, passages: [{n, title, text}]}` → `{answer, citedPassages: [n], mode, model, promptVersion, inputTokens, outputTokens}` |
 | `POST /triage` | `{subject, description, categories: [{id, name}]}` → `{categoryId|null, priority, reason, mode, model, promptVersion, inputTokens, outputTokens}` |
@@ -131,11 +141,11 @@ Backend (`/api/v1/ai`):
 Error order stays 400 → 403 → 404 → 409 → 429 → 503. The ticket is loaded through the HelpDesk read path, so a
 ticket the caller can't see is 404. Retrieval: top 5 chunks by cosine distance after the permission filter; if none,
 answer "I couldn't find anything about that in your workspace's documents." without calling the model
-(`mode: "OFFLINE"`, no citations, 0 tokens; the request still counts and is recorded).
+(`mode: "LOCAL"`, no citations, 0 tokens; the request still counts and is recorded).
 
 ## 6. Frontend
 
-- `features/ai`: API hooks, `AiOutput` wrapper (label + offline badge + citations list linking to
+- `features/ai`: API hooks, `AiOutput` wrapper (label + "Answered from your workspace's documents" + citations list linking to
   `/app/helpdesk/articles/:id` or `/app/hrms/policies/:id`).
 - Ticket page: an "AI assist" card (shown when `GET /ai/status` says enabled and the user has `ai.assistant.use`) with
   **Suggest triage** (shows suggestion, **Apply** calls the existing ticket update) and **Draft reply** (fills the
@@ -145,26 +155,25 @@ answer "I couldn't find anything about that in your workspace's documents." with
 
 ## 7. Error handling
 
-ai-service validates inputs (pydantic) and never returns 500 for model failures — it falls back (D7). Spring maps
-ai-service 4xx/5xx/timeouts to 503 (D12). Model output that fails validation is treated as an offline fallback in
-ai-service. Index failures never fail the user's publish/edit.
+ai-service validates inputs (pydantic, 422 on bad input). Spring maps ai-service 4xx/5xx/timeouts to 503 (D12).
+Index failures never fail the user's publish/edit.
 
 ## 8. Testing
 
-- ai-service: pytest with a fake embedder and fake Claude client — chunk-independent endpoints, offline triage rules,
-  citation numbers outside the passage set dropped, refusal/timeout → OFFLINE, no key → OFFLINE.
+- ai-service: pytest with a fake embedder — sentence selection and threshold, per-passage cap, citations only from
+  supplied passages, the no-answer path, reply-draft template, triage keyword rules and category threshold, input
+  validation (422 on empty/oversized input).
 - Backend: unit tests for chunking-independent logic; ITs with a stub `AiClient` bean: permission-filtered retrieval
   (a user without `helpdesk.article.read` gets no KB passages), cross-tenant chunks invisible (RLS IT over the three
   tables), unpublish removes chunks in the same transaction, disabled → 409, limit → 429, ai-service down → 503,
   usage row + audit written without question text, citations outside the retrieved set dropped, unknown category → null.
 - Frontend: vitest for the three UI surfaces and settings.
-- E2E: one journey with the real ai-service in offline mode (CI has no key): publish a policy, ask in My HR, see the
-  answer and the policy cited with the Offline badge; suggest triage on a ticket and apply it.
+- E2E: one journey with the real ai-service: publish a policy, ask in My HR, see an answer quoting it with the policy
+  cited; suggest triage on a ticket and apply it; draft a reply that lands in the composer.
 
 ## 9. Operations
 
-- Compose: backend gets `AI_SERVICE_URL=http://ai-service:8000`; ai-service gets `ANTHROPIC_API_KEY` and
-  `ANTHROPIC_MODEL` from `.env` (empty by default → offline). `make e2e` starts `ai-service` too. `.env.example`
-  documents `ANTHROPIC_API_KEY=` (empty).
-- README: AI section — how to add the key, what offline mode does, the one-off extension command for old volumes.
-- ADR-0014: AI gateway, permission-aware retrieval and offline fallback.
+- Compose: backend gets `AI_SERVICE_URL=http://ai-service:8000`; `make e2e` starts `ai-service` too. No secrets.
+- README: AI section — what runs where, how answers are assembled and cited, the one-off extension command for old
+  volumes.
+- ADR-0014: AI gateway, permission-aware retrieval and local extractive generation behind a provider interface.
