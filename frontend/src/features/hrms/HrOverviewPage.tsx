@@ -54,7 +54,10 @@ export function HrOverviewPage() {
         <div className="grid gap-4 lg:grid-cols-3">
           <section aria-label="People" className="space-y-3 rounded-lg border p-4">
             <h2 className="font-semibold">People</h2>
-            <p className="text-3xl font-semibold tabular-nums">{dashboard.data.activeHeadcount}</p>
+            <p className="text-3xl font-semibold tabular-nums">
+              <span className="sr-only">Active employees: </span>
+              {dashboard.data.activeHeadcount}
+            </p>
             <p className="text-sm text-muted-foreground">
               {dashboard.data.upcomingStarts} starting in the next 30 days ·{' '}
               {dashboard.data.joinersLast90Days} joined and {dashboard.data.leaversLast90Days} left

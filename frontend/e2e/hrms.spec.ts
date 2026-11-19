@@ -6,19 +6,18 @@ function hrTab(page: Page, name: string) {
   return page.getByRole('navigation', { name: 'HRMS' }).getByRole('link', { name })
 }
 
-/** yyyy-mm-dd in local time. */
+/** yyyy-mm-dd in UTC: the workspace's time zone (new workspaces are on UTC), whatever the runner's zone. */
 function iso(d: Date): string {
-  const pad = (n: number) => String(n).padStart(2, '0')
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
+  return d.toISOString().slice(0, 10)
 }
 
-/** The next Tuesday and Wednesday at least a day away: two working days in one calendar year and within 7 days. */
+/** The next Tuesday and Wednesday at least a day away (UTC): two working days in one calendar year and within 7 days. */
 function nextTuesdayAndWednesday(): [string, string] {
   const d = new Date()
-  d.setDate(d.getDate() + 1)
-  while (d.getDay() !== 2) d.setDate(d.getDate() + 1)
+  d.setUTCDate(d.getUTCDate() + 1)
+  while (d.getUTCDay() !== 2) d.setUTCDate(d.getUTCDate() + 1)
   const wed = new Date(d)
-  wed.setDate(d.getDate() + 1)
+  wed.setUTCDate(d.getUTCDate() + 1)
   return [iso(d), iso(wed)]
 }
 
@@ -147,6 +146,7 @@ test('a new hire is onboarded, closes a skill gap with training, and takes appro
   await hire.goto('/app/hrms/me')
   await expect(hire.getByRole('heading', { name: 'My HR' })).toBeVisible()
   await hire.getByRole('button', { name: 'Mark Advanced negotiation complete' }).click()
+  await hire.getByRole('dialog').getByRole('button', { name: 'Mark complete' }).click()
   await expect(hire.getByRole('region', { name: 'My training' })).toContainText(
     'No training assigned.',
   )
@@ -179,7 +179,8 @@ test('a new hire is onboarded, closes a skill gap with training, and takes appro
   await expect(hire.getByRole('region', { name: 'My leave' })).toContainText('18 days')
   await hrTab(page, 'Overview').click()
   const people = page.getByRole('region', { name: 'People' })
-  await expect(people).toContainText('2')
+  // Ada and Zoe: the headcount figure itself, not any "2" in the region
+  await expect(people).toContainText(/Active employees: 2(?!\d)/)
   await expect(page.getByRole('region', { name: 'Needs attention' })).toContainText(
     'Overdue trainings: 0',
   )

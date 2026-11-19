@@ -15,7 +15,7 @@ describe('HrOverviewPage', () => {
   it('shows headcount, movement and what needs attention', async () => {
     setup()
     const people = await screen.findByRole('region', { name: 'People' })
-    expect(within(people).getByText('12')).toBeInTheDocument()
+    expect(people).toHaveTextContent('Active employees: 12')
     expect(within(people).getByText('Sales')).toBeInTheDocument()
     expect(within(people).getByText('No department')).toBeInTheDocument()
     const attention = screen.getByRole('region', { name: 'Needs attention' })
