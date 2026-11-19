@@ -1,16 +1,19 @@
 package com.nexusops.hrms;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.nexusops.support.Api;
 import com.nexusops.support.IntegrationTestSupport;
+import com.nexusops.support.OwnerJdbc;
 import com.nexusops.support.RecordingMailSender;
 import com.nexusops.support.TestHr;
 import com.nexusops.support.TestMembers;
 import com.nexusops.support.TestRoles;
 import com.nexusops.support.TestTenants;
 import com.nexusops.support.TestTenants.Workspace;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import org.hamcrest.Matchers;
@@ -53,6 +56,10 @@ class PolicyApiIT extends IntegrationTestSupport {
                 .andExpect(jsonPath("$.status").value("DRAFT")).andExpect(jsonPath("$.publishedAt").doesNotExist());
         owner.post("/api/v1/hr/policies/" + id + "/archive", "{\"version\":3}").andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("ARCHIVED"));
+        // the audit trail records the state before archiving, not after
+        assertThat(OwnerJdbc.ownerAs(ws.tenantId()).queryForList("select before ->> 'status' as before, "
+                + "after ->> 'status' as after from audit_events where action = 'PolicyArchived'"))
+                .containsExactly(Map.of("before", "DRAFT", "after", "ARCHIVED"));
         owner.post("/api/v1/hr/policies/" + id + "/publish", "{\"version\":4}").andExpect(status().isConflict());
         owner.put("/api/v1/hr/policies/" + id, "{\"title\":\"X\",\"body\":\"Y\",\"version\":4}")
                 .andExpect(status().isConflict());

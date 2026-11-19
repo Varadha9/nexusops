@@ -121,9 +121,10 @@ public class PolicyService {
         HrPolicy policy = find(id);
         checkVersion(policy, version);
         if (policy.getStatus() != PolicyStatus.ARCHIVED) {
+            Map<String, Object> before = snapshot(policy);
             policy.archive(Instant.now());
             policies.flush();
-            audit.record(AuditEntry.of("PolicyArchived", "HrPolicy", id).withBefore(snapshot(policy)));
+            audit.record(AuditEntry.of("PolicyArchived", "HrPolicy", id).withBefore(before).withAfter(snapshot(policy)));
         }
         return view(policy);
     }
