@@ -1,4 +1,4 @@
-import { screen, waitFor, within } from '@testing-library/react'
+import { act, screen, waitFor, within } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 import { fakeServer } from '@/test/fakeServer'
 import { signedIn, testProfile } from '@/test/fixtures'
@@ -50,9 +50,11 @@ function setup({
 
 describe('TicketAiCard', () => {
   it('is hidden when AI is turned off for the workspace', async () => {
-    const { server } = setup({ status: { enabled: false, provider: 'LOCAL' } })
+    const { queryClient } = setup({ status: { enabled: false, provider: 'LOCAL' } })
     await screen.findByRole('region', { name: 'Details' })
-    await waitFor(() => expect(server.callsTo('GET /ai/status')).toHaveLength(1))
+    // wait until the status response has been stored and rendered, then check the card stayed away
+    await waitFor(() => expect(queryClient.getQueryData(['ai', 'status'])).toBeDefined())
+    await act(async () => {})
     expect(screen.queryByRole('region', { name: 'AI assist' })).not.toBeInTheDocument()
   })
 

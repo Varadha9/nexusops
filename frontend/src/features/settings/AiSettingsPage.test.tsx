@@ -65,13 +65,40 @@ describe('AiSettingsPage', () => {
     expect(await screen.findByText('Indexed 7 documents (31 passages).')).toBeInTheDocument()
   })
 
-  it('needs the AI settings permission', async () => {
+  it('keeps the message and the edits after a stale-version conflict', async () => {
+    const { server, user } = setup()
+    const limit = await screen.findByLabelText('Monthly request limit')
+    server.on('PUT /ai/settings', {
+      status: 409,
+      body: { detail: 'This was changed by someone else. Reload and try again.' },
+    })
+    server.on('GET /ai/settings', { body: anAiSettings({ version: 4 }) })
+    await user.clear(limit)
+    await user.type(limit, '900')
+    await user.click(screen.getByRole('button', { name: 'Save changes' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'This was changed by someone else. Reload and try again.',
+    )
+    await waitFor(() => expect(server.callsTo('GET /ai/settings').length).toBeGreaterThan(1))
+    await screen.findByText('12 of 500')
+    expect(screen.getByRole('alert')).toHaveTextContent('changed by someone else')
+    expect(screen.getByLabelText('Monthly request limit')).toHaveValue('900')
+    // the retry carries the version the refetch returned
+    server.on('PUT /ai/settings', (req) => ({ body: anAiSettings(req.body as object) }))
+    await user.click(screen.getByRole('button', { name: 'Save changes' }))
+    await waitFor(() => expect(server.callsTo('PUT /ai/settings')).toHaveLength(2))
+    expect(server.callsTo('PUT /ai/settings')[1].body).toMatchObject({
+      monthlyLimit: 900,
+      version: 4,
+    })
+  })
+
+  it('shows no access without the AI settings permission', async () => {
     const server = fakeServer()
     signedIn(server, testProfile({ permissions: ['tenant.settings.read'] }))
     renderApp({ server, path: '/app/settings/ai' })
-    await waitFor(() =>
-      expect(screen.queryByRole('switch', { name: 'AI assistance is on' })).not.toBeInTheDocument(),
-    )
+    expect(await screen.findByText("You don't have access to this page")).toBeInTheDocument()
+    expect(screen.queryByRole('switch')).not.toBeInTheDocument()
     expect(server.callsTo('GET /ai/settings')).toHaveLength(0)
   })
 })

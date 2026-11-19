@@ -33,7 +33,7 @@ export function AiSettingsPage() {
       ) : settings.isError ? (
         <ErrorState error={settings.error} onRetry={() => void settings.refetch()} />
       ) : (
-        <AiSettingsForm key={settings.data.version} settings={settings.data} />
+        <AiSettingsForm settings={settings.data} />
       )}
     </>
   )
@@ -81,6 +81,7 @@ function AiSettingsForm({ settings }: { settings: AiSettingsView }) {
       else {
         setFormError(problemMessage(e))
         // a conflict means someone else saved first: reload so the next save carries the current version
+        // (the form is not keyed on it, so the message and the user's edits stay on screen)
         void queryClient.invalidateQueries({ queryKey: ['ai'] })
       }
     }

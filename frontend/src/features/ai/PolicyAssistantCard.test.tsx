@@ -1,4 +1,4 @@
-import { screen, waitFor, within } from '@testing-library/react'
+import { act, screen, waitFor, within } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 import { fakeServer } from '@/test/fakeServer'
 import { signedIn, testProfile } from '@/test/fixtures'
@@ -20,9 +20,11 @@ function setup(status = { enabled: true, provider: 'LOCAL' }) {
 
 describe('PolicyAssistantCard', () => {
   it('is hidden when AI is turned off', async () => {
-    const { server } = setup({ enabled: false, provider: 'LOCAL' })
+    const { queryClient } = setup({ enabled: false, provider: 'LOCAL' })
     await screen.findByRole('heading', { name: 'My HR' })
-    await waitFor(() => expect(server.callsTo('GET /ai/status')).toHaveLength(1))
+    // wait until the status response has been stored and rendered, then check the card stayed away
+    await waitFor(() => expect(queryClient.getQueryData(['ai', 'status'])).toBeDefined())
+    await act(async () => {})
     expect(screen.queryByRole('region', { name: 'Ask about HR policies' })).not.toBeInTheDocument()
   })
 
