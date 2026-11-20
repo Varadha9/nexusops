@@ -86,8 +86,9 @@ public class HttpAiClient implements AiClient {
         if (r.answer() == null) {
             throw unavailable("/answer", "no answer", null);
         }
-        return new AiAnswer(r.answer(), r.citedPassages() == null ? List.of() : r.citedPassages(), r.mode(), r.model(),
-                r.promptVersion(), r.inputTokens(), r.outputTokens());
+        return new AiAnswer(r.answer(), r.citedPassages() == null ? List.of() : r.citedPassages(),
+                Boolean.TRUE.equals(r.grounded()), r.mode(), r.model(), r.promptVersion(), r.inputTokens(),
+                r.outputTokens());
     }
 
     @Override
@@ -167,8 +168,8 @@ public class HttpAiClient implements AiClient {
     record AnswerRequest(String task, String question, List<Passage> passages) {}
 
     @JsonIgnoreProperties(ignoreUnknown = true)
-    record AnswerResponse(String answer, List<Integer> citedPassages, String mode, String model, String promptVersion,
-            int inputTokens, int outputTokens) {}
+    record AnswerResponse(String answer, List<Integer> citedPassages, Boolean grounded, String mode, String model,
+            String promptVersion, int inputTokens, int outputTokens) {}
 
     record CategoryRequest(String id, String name) {}
 

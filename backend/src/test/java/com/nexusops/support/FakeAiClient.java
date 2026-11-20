@@ -32,8 +32,14 @@ public class FakeAiClient implements AiClient {
     public volatile boolean down;
     /** Passage numbers {@link #answer} cites; null cites every passage. */
     public volatile List<Integer> forcedCitations;
+    /** Text {@link #answer} returns; null returns {@code "FAKE: <n> passages"}. */
+    public volatile String forcedAnswer;
+    /** Whether {@link #answer} says it is grounded; null means "when it cites anything". */
+    public volatile Boolean forcedGrounded;
     /** Category id {@link #triage} returns; null returns the first category's id (or null when there are none). */
     public volatile String forcedCategoryId;
+    /** The categories the last {@link #triage} call was given. */
+    public volatile List<CategoryOption> lastTriageCategories;
     public final AtomicInteger embedCalls = new AtomicInteger();
     public final AtomicInteger answerCalls = new AtomicInteger();
     public final AtomicInteger triageCalls = new AtomicInteger();
@@ -43,7 +49,10 @@ public class FakeAiClient implements AiClient {
     public void reset() {
         down = false;
         forcedCitations = null;
+        forcedAnswer = null;
+        forcedGrounded = null;
         forcedCategoryId = null;
+        lastTriageCategories = null;
         embedCalls.set(0);
         answerCalls.set(0);
         triageCalls.set(0);
@@ -67,7 +76,9 @@ public class FakeAiClient implements AiClient {
         failIfDown();
         List<Integer> cited = forcedCitations != null ? List.copyOf(forcedCitations)
                 : passages.stream().map(Passage::n).toList();
-        return new AiAnswer("FAKE: " + passages.size() + " passages", cited, "LOCAL", MODEL,
+        String text = forcedAnswer != null ? forcedAnswer : "FAKE: " + passages.size() + " passages";
+        boolean grounded = forcedGrounded != null ? forcedGrounded : !cited.isEmpty();
+        return new AiAnswer(text, cited, grounded, "LOCAL", MODEL,
                 "TICKET_REPLY".equals(task) ? "reply-v1" : "policy-v1", 0, 0);
     }
 
@@ -75,6 +86,7 @@ public class FakeAiClient implements AiClient {
     public AiTriage triage(String subject, String description, List<CategoryOption> categories) {
         triageCalls.incrementAndGet();
         failIfDown();
+        lastTriageCategories = List.copyOf(categories);
         String categoryId = forcedCategoryId != null ? forcedCategoryId
                 : categories.isEmpty() ? null : categories.getFirst().id().toString();
         return new AiTriage(categoryId, "NORMAL", "FAKE triage", "LOCAL", MODEL, "triage-v1", 0, 0);

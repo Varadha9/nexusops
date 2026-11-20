@@ -5,6 +5,7 @@ import com.nexusops.ai.client.AiTriage;
 import com.nexusops.ai.client.CategoryOption;
 import com.nexusops.ai.client.Passage;
 import com.nexusops.helpdesk.CategoryService;
+import com.nexusops.helpdesk.CategoryView;
 import com.nexusops.helpdesk.Priority;
 import com.nexusops.helpdesk.TicketService;
 import com.nexusops.helpdesk.TicketView;
@@ -20,6 +21,8 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import java.util.function.Supplier;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import org.springframework.stereotype.Service;
 
 /**
@@ -48,6 +51,8 @@ public class AiAssistService {
     static final int TOP_K = 5;
     static final int QUESTION_MIN = 3;
     static final int QUESTION_MAX = 500;
+    static final int MAX_TRIAGE_CATEGORIES = 100; // ai-service's limit
+    private static final Pattern MARKER = Pattern.compile("( ?)\\[(\\d{1,4})\\]");
 
     private final TicketService tickets;
     private final CategoryService categories;
@@ -72,8 +77,7 @@ public class AiAssistService {
     public AiTriageView triage(UUID ticketId) {
         TicketView ticket = tickets.get(ticketId);
         admit();
-        List<CategoryOption> options = categories.list(false).stream()
-                .map(c -> new CategoryOption(c.id(), c.name())).toList();
+        List<CategoryOption> options = triageOptions(categories.list(false));
         long started = System.nanoTime();
         AiTriage triage = call(() -> ai.triage(ticket.subject(), ticket.description(), options));
         CategoryOption category = category(triage.categoryId(), options);
@@ -90,7 +94,8 @@ public class AiAssistService {
         admit();
         String query = ticket.subject() + "\n" + Objects.requireNonNullElse(ticket.description(), "");
         Answered answered = answer(TICKET_REPLY, "reply-v1", query, Set.of(KB_ARTICLE));
-        return new AiDraftView(answered.text(), answered.citations(), answered.mode());
+        return new AiDraftView(answered.text(), answered.citations(),
+                answered.grounded() && !answered.citations().isEmpty(), answered.mode());
     }
 
     /** An answer from the published HR policies. */
@@ -101,7 +106,7 @@ public class AiAssistService {
         return new AiAnswerView(answered.text(), answered.citations(), answered.mode());
     }
 
-    private record Answered(String text, List<AiCitation> citations, String mode) {}
+    private record Answered(String text, List<AiCitation> citations, boolean grounded, String mode) {}
 
     /**
      * Retrieves the caller's top passages and asks ai-service for an extractive answer. With nothing retrieved the
@@ -120,7 +125,7 @@ public class AiAssistService {
         if (chunks.isEmpty()) {
             usage.record(new AiUsage.Completed(feature, MODE, MODEL, promptVersion, 0, 0, elapsedMs(started),
                     List.of()));
-            return new Answered(NOTHING_FOUND, List.of(), MODE);
+            return new Answered(NOTHING_FOUND, List.of(), false, MODE);
         }
         List<Passage> passages = new ArrayList<>(chunks.size());
         for (int i = 0; i < chunks.size(); i++) {
@@ -132,7 +137,8 @@ public class AiAssistService {
         usage.record(new AiUsage.Completed(feature, mode, orDefault(answer.model(), MODEL),
                 orDefault(answer.promptVersion(), promptVersion), answer.inputTokens(), answer.outputTokens(),
                 elapsedMs(started), citations.stream().map(AiCitation::sourceId).toList()));
-        return new Answered(answer.answer(), citations, mode);
+        return new Answered(renumber(answer.answer(), chunks, answer.citedPassages(), citations), citations,
+                answer.grounded(), mode);
     }
 
     /** 409 when AI is off, 429 when this month's limit is used up or the caller's per-minute bucket is empty. */
@@ -187,6 +193,41 @@ public class AiAssistService {
             }
         }
         return List.copyOf(citations);
+    }
+
+    /**
+     * Rewrites each passage marker {@code [n]} in {@code text} to {@code [k]}, k being the 1-based position of passage
+     * n's document in {@code citations}, so the markers point at the sources the user sees (two passages of one
+     * document share its number). Markers for passages that weren't cited or weren't sent are removed (D8).
+     */
+    static String renumber(String text, List<RetrievedChunk> chunks, List<Integer> cited, List<AiCitation> citations) {
+        if (text == null || text.indexOf('[') < 0) {
+            return text;
+        }
+        Set<Integer> wanted = cited == null ? Set.of() : new HashSet<>(cited);
+        Matcher m = MARKER.matcher(text);
+        StringBuilder out = new StringBuilder(text.length());
+        while (m.find()) {
+            int n = Integer.parseInt(m.group(2));
+            int k = -1;
+            if (n >= 1 && n <= chunks.size() && wanted.contains(n)) {
+                UUID source = chunks.get(n - 1).sourceId();
+                for (int i = 0; i < citations.size(); i++) {
+                    if (citations.get(i).sourceId().equals(source)) {
+                        k = i + 1;
+                        break;
+                    }
+                }
+            }
+            m.appendReplacement(out, k < 0 ? "" : Matcher.quoteReplacement(m.group(1) + "[" + k + "]"));
+        }
+        m.appendTail(out);
+        return out.toString();
+    }
+
+    /** The categories triage chooses from: the workspace's active ones in its order, at most ai-service's 100. */
+    static List<CategoryOption> triageOptions(List<CategoryView> active) {
+        return active.stream().limit(MAX_TRIAGE_CATEGORIES).map(c -> new CategoryOption(c.id(), c.name())).toList();
     }
 
     /** The suggested category if it is one of {@code options}; anything else is no category (D8). */

@@ -73,16 +73,23 @@ class HttpAiClientTest {
 
     @Test
     void answerUsesTheCamelCaseContractAndCapsPassageText() {
-        responses.put("/answer", "{\"answer\":\"Leave is 20 days [1].\",\"citedPassages\":[1],\"mode\":\"LOCAL\","
+        responses.put("/answer", "{\"answer\":\"Leave is 20 days [1].\",\"citedPassages\":[1],\"grounded\":true,"
+                + "\"mode\":\"LOCAL\","
                 + "\"model\":\"bge-small-en-v1.5\",\"promptVersion\":\"policy-v1\",\"inputTokens\":0,"
                 + "\"outputTokens\":0}");
         AiAnswer answer = client.answer("POLICY_QUESTION", "How much leave?",
                 List.of(new Passage(1, "Leave policy", "x".repeat(2000))));
-        assertThat(answer).isEqualTo(new AiAnswer("Leave is 20 days [1].", List.of(1), "LOCAL", "bge-small-en-v1.5",
-                "policy-v1", 0, 0));
+        assertThat(answer).isEqualTo(new AiAnswer("Leave is 20 days [1].", List.of(1), true, "LOCAL",
+                "bge-small-en-v1.5", "policy-v1", 0, 0));
         assertThat(requests.get("/answer")).startsWith("{\"task\":\"POLICY_QUESTION\",\"question\":\"How much leave?\","
                 + "\"passages\":[{\"n\":1,\"title\":\"Leave policy\",\"text\":\"xxx")
                 .contains("\"text\":\"" + "x".repeat(Chunker.MAX_LENGTH) + "\"");
+
+        // an answer that doesn't say it is grounded is treated as not grounded
+        responses.put("/answer", "{\"answer\":\"These may help\",\"citedPassages\":[1],\"mode\":\"LOCAL\","
+                + "\"model\":\"bge-small-en-v1.5\",\"promptVersion\":\"reply-v1\",\"inputTokens\":0,"
+                + "\"outputTokens\":0}");
+        assertThat(client.answer("TICKET_REPLY", "q", List.of(new Passage(1, "t", "x"))).grounded()).isFalse();
     }
 
     @Test

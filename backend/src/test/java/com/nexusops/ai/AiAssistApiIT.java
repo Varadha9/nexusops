@@ -156,6 +156,7 @@ class AiAssistApiIT extends IntegrationTestSupport {
         // the owner can read articles: the draft cites the article
         owner.post("/api/v1/ai/helpdesk/tickets/" + id + "/reply-draft", "").andExpect(status().isOk())
                 .andExpect(jsonPath("$.draft").value(Matchers.startsWith("FAKE:")))
+                .andExpect(jsonPath("$.grounded").value(true))
                 .andExpect(jsonPath("$.citations[0].sourceType").value("KB_ARTICLE"))
                 .andExpect(jsonPath("$.citations[0].sourceId").value(article.toString()))
                 .andExpect(jsonPath("$.mode").value("LOCAL"));
@@ -164,6 +165,7 @@ class AiAssistApiIT extends IntegrationTestSupport {
         Api agent = Api.login(mvc, members.create(ws.tenantId(), Set.of(agentRole)));
         agent.post("/api/v1/ai/helpdesk/tickets/" + id + "/reply-draft", "").andExpect(status().isOk())
                 .andExpect(jsonPath("$.draft").value(NOTHING_FOUND))
+                .andExpect(jsonPath("$.grounded").value(false))
                 .andExpect(jsonPath("$.citations").isEmpty());
 
         UUID readerRole = TestRoles.create(mvc, owner.session(), "Reader", "helpdesk.ticket.read",
@@ -174,6 +176,42 @@ class AiAssistApiIT extends IntegrationTestSupport {
         reader.post(POLICY_QUESTIONS, question("Can I work remotely?")).andExpect(status().isForbidden());
         reader.get("/api/v1/ai/status").andExpect(status().isForbidden());
         assertThat(requests()).extracting(r -> r.get("feature")).containsExactly("TICKET_REPLY", "TICKET_REPLY");
+    }
+
+    @Test
+    void aReplyDraftWithNoClearAnswerIsNotGroundedButNamesTheArticlesThatMayHelp() throws Exception {
+        UUID article = publishedArticle("Clearing a paper jam", "Open the rear tray and remove the jammed paper.");
+        UUID id = ticket(owner, requester, "Printer paper jam", "Paper is jammed in the rear tray");
+        ai.forcedAnswer = "I couldn't find a clear answer in your workspace's documents. These may help:\n"
+                + "- Clearing a paper jam";
+        ai.forcedGrounded = false;
+        owner.post("/api/v1/ai/helpdesk/tickets/" + id + "/reply-draft", "").andExpect(status().isOk())
+                .andExpect(jsonPath("$.draft").value(ai.forcedAnswer))
+                .andExpect(jsonPath("$.grounded").value(false))
+                .andExpect(jsonPath("$.citations[0].sourceId").value(article.toString()));
+    }
+
+    @Test
+    void policyAnswerMarkersFollowTheListedSources() throws Exception {
+        publishedPolicy("Remote work policy", "Staff may work remotely two days a week.");
+        publishedPolicy("Travel policy", "Book economy class for work travel.");
+        // only passage 2 is cited, so it is source [1]; the marker for passage 7 (never sent) is removed
+        ai.forcedCitations = List.of(2);
+        ai.forcedAnswer = "Book economy class for work travel. [2] Something else. [7]";
+        owner.post(POLICY_QUESTIONS, question("Which class do I book for work travel?")).andExpect(status().isOk())
+                .andExpect(jsonPath("$.answer").value("Book economy class for work travel. [1] Something else."))
+                .andExpect(jsonPath("$.citations.length()").value(1));
+    }
+
+    @Test
+    void triageSendsAtMost100CategoriesSoAnyNumberOfCategoriesWorks() throws Exception {
+        for (int i = 0; i < 101; i++) {
+            owner.post("/api/v1/helpdesk/categories", "{\"name\":\"Category " + i + "\"}")
+                    .andExpect(status().isCreated());
+        }
+        UUID id = ticket(owner, requester, "Invoice charged twice", "My card was charged twice for one invoice");
+        owner.post("/api/v1/ai/helpdesk/tickets/" + id + "/triage", "").andExpect(status().isOk());
+        assertThat(ai.lastTriageCategories).hasSize(100);
     }
 
     @Test
