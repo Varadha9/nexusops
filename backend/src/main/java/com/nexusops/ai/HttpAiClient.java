@@ -15,8 +15,10 @@ import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.http.MediaType;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
+import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
+import org.springframework.web.client.RestClientResponseException;
 
 /**
  * {@link AiClient} over ai-service's JSON API (spec §5). Connect timeout 2 s, read timeout 20 s (health: 2 s). Any
@@ -107,7 +109,7 @@ public class HttpAiClient implements AiClient {
         try {
             r = healthClient.get().uri("/health").retrieve().body(HealthResponse.class);
         } catch (RestClientException e) {
-            throw unavailable("/health", e.getMessage(), e);
+            throw unavailable("/health", reason(e), safeCause(e));
         }
         if (r == null || r.provider() == null) {
             throw unavailable("/health", "empty body", null);
@@ -120,7 +122,7 @@ public class HttpAiClient implements AiClient {
         try {
             response = client.post().uri(path).contentType(MediaType.APPLICATION_JSON).body(body).retrieve().body(type);
         } catch (RestClientException e) {
-            throw unavailable(path, e.getMessage(), e);
+            throw unavailable(path, reason(e), safeCause(e));
         }
         if (response == null) {
             throw unavailable(path, "empty body", null);
@@ -131,6 +133,23 @@ public class HttpAiClient implements AiClient {
     private static AiUnavailableException unavailable(String path, String reason, Throwable cause) {
         log.warn("ai-service {} failed: {}", path, reason);
         return new AiUnavailableException("ai-service " + path + " failed: " + reason, cause);
+    }
+
+    /**
+     * Status code or exception type only: a response exception's message embeds the body, and ai-service's 422 bodies
+     * echo the offending input (question or ticket text), which must not reach logs.
+     */
+    static String reason(RestClientException e) {
+        if (e instanceof RestClientResponseException response) {
+            return "HTTP " + response.getStatusCode().value();
+        }
+        Throwable root = e.getMostSpecificCause();
+        return root == null ? e.getClass().getSimpleName() : root.getClass().getSimpleName();
+    }
+
+    /** Only transport failures are kept as the cause: response and parse errors can carry body text. */
+    private static Throwable safeCause(RestClientException e) {
+        return e instanceof ResourceAccessException ? e : null;
     }
 
     private static String cap(String value, int max) {

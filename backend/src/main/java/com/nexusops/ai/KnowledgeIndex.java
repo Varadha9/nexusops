@@ -18,8 +18,10 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.Executor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.event.EventListener;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
@@ -34,6 +36,9 @@ import org.springframework.transaction.support.TransactionTemplate;
  * inside the publisher's transaction, so a withdrawn document is never retrievable after that commit; re-embedding
  * happens after commit and, if ai-service is down, only logs (the source stays un-indexed until its next change or a
  * rebuild). Every query runs under the tenant's RLS session.
+ *
+ * <p>The re-embed runs on the small {@code aiIndexExecutor} pool (tenant bound via {@link TenantContext#runAs}),
+ * never on the request thread: its read, its ai-service calls and its write each use their own short connection.
  *
  * <p>Index writes take the tenant's {@code ai_index} advisory lock and re-read the source under it, so a slow
  * re-embed can't re-insert a document that was unpublished, archived or edited while it was being embedded.
@@ -67,10 +72,13 @@ public class KnowledgeIndex {
     private final TransactionTemplate readOnlyTx;
     private final TransactionTemplate newTx;
     private final TransactionTemplate newReadOnlyTx;
+    private final Executor executor;
 
     KnowledgeIndex(JdbcTemplate jdbc, AiClient ai, TenantLocks locks, List<KnowledgeSource> sources,
-            PlatformTransactionManager transactions) {
+            PlatformTransactionManager transactions,
+            @Qualifier(AiIndexExecutorConfig.AI_INDEX_EXECUTOR) Executor executor) {
         this.jdbc = jdbc;
+        this.executor = executor;
         this.ai = ai;
         this.locks = locks;
         for (KnowledgeSource source : sources) {
@@ -95,9 +103,26 @@ public class KnowledgeIndex {
         delete(event.sourceType(), event.sourceId());
     }
 
-    /** After commit: re-embed the source if it is (still) published. Never fails the caller. */
+    /**
+     * After commit: hands the re-embed to {@code aiIndexExecutor}, so the request neither waits for ai-service nor
+     * holds its still-checked-out connection while two more are taken. Never fails the caller.
+     */
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void reindex(KnowledgeChanged event) {
+        Optional<UUID> tenant = TenantContext.tenantId();
+        if (tenant.isEmpty()) {
+            log.warn("Not indexing {} {}: no tenant bound", event.sourceType(), event.sourceId());
+            return;
+        }
+        try {
+            executor.execute(() -> TenantContext.runAs(tenant.get(), () -> reindexNow(event)));
+        } catch (RuntimeException e) {
+            log.warn("Could not queue indexing of {} {}: {}", event.sourceType(), event.sourceId(), e.toString());
+        }
+    }
+
+    /** Re-embeds the source if it is (still) published; on the index executor, with the tenant bound. */
+    void reindexNow(KnowledgeChanged event) {
         try {
             KnowledgeSource source = source(event.sourceType());
             Optional<KnowledgeDocument> document = newReadOnlyTx.execute(s -> source.findPublished(event.sourceId()));

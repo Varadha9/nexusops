@@ -110,6 +110,18 @@ class HttpAiClientTest {
     }
 
     @Test
+    void errorMessagesNeverCarryTheResponseBody() {
+        statuses.put("/answer", 422);
+        responses.put("/answer", "{\"detail\":[{\"input\":\"my secret question\"}]}");
+        assertThatThrownBy(() -> client.answer("POLICY_QUESTION", "my secret question", List.of()))
+                .isInstanceOf(AiUnavailableException.class).hasMessage("ai-service /answer failed: HTTP 422")
+                .hasNoCause();
+        responses.put("/health", "{not json: my secret question");
+        assertThatThrownBy(() -> client.health()).isInstanceOf(AiUnavailableException.class)
+                .hasMessageNotContaining("secret").hasNoCause();
+    }
+
+    @Test
     void errorsAndUnreachableServiceBecomeAiUnavailable() {
         statuses.put("/answer", 500);
         assertThatThrownBy(() -> client.answer("TICKET_REPLY", "q", List.of()))

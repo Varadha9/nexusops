@@ -11,6 +11,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Locale;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.IntStream;
@@ -36,6 +37,8 @@ public class FakeAiClient implements AiClient {
     public final AtomicInteger embedCalls = new AtomicInteger();
     public final AtomicInteger answerCalls = new AtomicInteger();
     public final AtomicInteger triageCalls = new AtomicInteger();
+    /** Runs once, inside the next {@link #embed} call before it returns (to interleave a change with indexing). */
+    public final AtomicReference<Runnable> onNextEmbed = new AtomicReference<>();
 
     public void reset() {
         down = false;
@@ -44,12 +47,17 @@ public class FakeAiClient implements AiClient {
         embedCalls.set(0);
         answerCalls.set(0);
         triageCalls.set(0);
+        onNextEmbed.set(null);
     }
 
     @Override
     public List<float[]> embed(List<String> texts) {
         embedCalls.incrementAndGet();
         failIfDown();
+        Runnable hook = onNextEmbed.getAndSet(null);
+        if (hook != null) {
+            hook.run();
+        }
         return texts.stream().map(FakeAiClient::vector).toList();
     }
 

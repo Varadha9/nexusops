@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.nexusops.shared.TenantContext;
+import com.nexusops.shared.knowledge.KnowledgeChanged;
 import com.nexusops.support.Api;
 import com.nexusops.support.FakeAiClient;
 import com.nexusops.support.IntegrationTestSupport;
@@ -18,6 +19,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import org.junit.jupiter.api.AfterEach;
@@ -176,6 +178,68 @@ class KnowledgeIndexIT extends IntegrationTestSupport {
                 .extracting(RetrievedChunk::sourceId).containsExactly(leave);
         assertThat(search("paper jam", Set.of("HR_POLICY"), Set.of("helpdesk.article.read", "hr.self.service")))
                 .extracting(RetrievedChunk::sourceId).containsExactly(leave);
+    }
+
+    interface ApiCall {
+        void run() throws Exception;
+    }
+
+    /** Runs {@code call} to completion on another thread (its own request and transaction). */
+    private static Runnable onAnotherThread(ApiCall call) {
+        return () -> {
+            AtomicReference<Throwable> failure = new AtomicReference<>();
+            Thread thread = Thread.ofPlatform().start(() -> {
+                try {
+                    call.run();
+                } catch (Throwable e) {
+                    failure.set(e);
+                }
+            });
+            try {
+                thread.join(30_000);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                throw new IllegalStateException(e);
+            }
+            if (failure.get() != null) {
+                throw new IllegalStateException(failure.get());
+            }
+        };
+    }
+
+    /** Publishes without indexing (ai-service down), so the test can drive one re-index itself. */
+    private UUID publishedButNotIndexed() throws Exception {
+        UUID id = article("Clearing a paper jam", PAPER_JAM);
+        ai.down = true;
+        action("/api/v1/helpdesk/articles", id, "publish", 0);
+        ai.down = false;
+        assertThat(chunks(id)).isEmpty();
+        return id;
+    }
+
+    @Test
+    void aSourceWithdrawnWhileItIsBeingEmbeddedIsNotIndexed() throws Exception {
+        UUID id = publishedButNotIndexed();
+        ai.onNextEmbed.set(onAnotherThread(() -> action("/api/v1/helpdesk/articles", id, "unpublish", 1)));
+
+        TenantContext.runAs(ws.tenantId(), () -> index.reindex(new KnowledgeChanged("KB_ARTICLE", id)));
+
+        assertThat(ai.onNextEmbed.get()).as("the unpublish ran during the embed").isNull();
+        assertThat(chunks(id)).isEmpty();
+    }
+
+    @Test
+    void aSourceEditedWhileItIsBeingEmbeddedKeepsOnlyTheNewChunks() throws Exception {
+        UUID id = publishedButNotIndexed();
+        ai.onNextEmbed.set(onAnotherThread(() -> owner.put("/api/v1/helpdesk/articles/" + id,
+                "{\"title\":\"Clearing a paper jam\",\"body\":\"Lift the top cover first.\",\"version\":1}")
+                .andExpect(status().isOk())));
+
+        TenantContext.runAs(ws.tenantId(), () -> index.reindex(new KnowledgeChanged("KB_ARTICLE", id)));
+
+        assertThat(ai.onNextEmbed.get()).as("the edit ran during the embed").isNull();
+        assertThat(chunks(id)).singleElement()
+                .satisfies(c -> assertThat(c).containsEntry("content", "Lift the top cover first."));
     }
 
     @Test
