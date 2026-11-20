@@ -83,8 +83,8 @@ prompt registry UI, evaluation harness and dataset, document (file) ingestion, s
   rate limit rule `ai` (20 per minute, authenticated API fails open as today).
 - **D10 — Usage and audit.** Every completed AI call inserts an `ai_requests` row: feature, mode, model, prompt version,
   input/output tokens (0 for local generation), latency ms, cited source ids, user id. No question or answer text is stored (PII
-  minimisation). Each call also writes audit event `ai.request.completed` (entity `ai_request`); settings changes write
-  `ai.settings.updated`; a rebuild writes `ai.index.rebuilt`.
+  minimisation). Each call also writes audit event `AiRequestCompleted` (entity `ai_request`); settings changes write
+  `AiSettingsUpdated`; a rebuild writes `AiIndexRebuilt`.
 - **D11 — Permissions.** New core (module-less) permissions `ai.assistant.use` ("Use AI assistance") and
   `ai.settings.manage` ("Turn AI on or off, set its limit and rebuild its index"), granted to system roles.
   Feature routes additionally require the feature's own read permission (below), so a disabled HELPDESK/HRMS module

@@ -32,7 +32,7 @@
   - No retrieved chunks: answer `I couldn't find anything about that in your workspace's documents.`
   - No sentence over threshold: `I couldn't find a clear answer in your workspace's documents. These may help:`
 - Rate-limit rule `ai: { capacity: 20, window: 1m }`, per tenant+user, fails OPEN like the authenticated API.
-- Audit actions: `ai.request.completed` (entity type `ai_request`), `ai.settings.updated` (`ai_settings`), `ai.index.rebuilt` (`ai_index`). Never store or audit question/answer text.
+- Audit actions: `AiRequestCompleted` (entity type `ai_request`), `AiSettingsUpdated` (`ai_settings`), `AiIndexRebuilt` (`ai_index`). Never store or audit question/answer text.
 - Defaults: `ai_settings.enabled = true`, `monthly_limit = 500`. Month = UTC calendar month.
 - Spring → ai-service: base URL property `nexusops.ai.service-url` (env `AI_SERVICE_URL`, default `http://localhost:8000`), connect timeout 2 s, read timeout 20 s.
 - UI copy verbatim: card titles `AI assist`, `Ask about HR policies`; buttons `Suggest triage`, `Apply`, `Draft reply`, `Ask`, `Rebuild index`; label `AI-generated — check before use`; caption `Answered from your workspace's documents`; settings tab `AI`.
@@ -343,8 +343,8 @@ LIMIT ?
   - disabled (`PUT settings enabled=false`) → each feature 409 verbatim; status shows `enabled:false`.
   - limit: `monthlyLimit=1`, first call 200, second 429 verbatim.
   - `FakeAiClient.down = true` → 503 verbatim, no new `ai_requests` row; `GET status` → `provider:"UNAVAILABLE"`.
-  - usage + audit: after a policy question, one `ai_requests` row (feature `POLICY_QUESTION`, `source_ids` = cited policy ids, `user_id` = caller) and one audit event `ai.request.completed`; neither the row nor the audit details contain the question text (assert the question string is absent from the audit `details` JSON).
-  - settings: GET defaults `enabled:true, monthlyLimit:500, usedThisMonth:0`; PUT `monthlyLimit` 0 and 100001 → 400 field message; stale version → 409; audit `ai.settings.updated`; rebuild returns counts and audits `ai.index.rebuilt`; member without `ai.settings.manage` → 403.
+  - usage + audit: after a policy question, one `ai_requests` row (feature `POLICY_QUESTION`, `source_ids` = cited policy ids, `user_id` = caller) and one audit event `AiRequestCompleted`; neither the row nor the audit details contain the question text (assert the question string is absent from the audit `details` JSON).
+  - settings: GET defaults `enabled:true, monthlyLimit:500, usedThisMonth:0`; PUT `monthlyLimit` 0 and 100001 → 400 field message; stale version → 409; audit `AiSettingsUpdated`; rebuild returns counts and audits `AiIndexRebuilt`; member without `ai.settings.manage` → 403.
 
 - [ ] **Step 3: Implement.**
   - `AiSettingsService`: `current()` (read or lazily insert defaults under `TenantLocks.lock("ai-settings")`), `update(AiSettingsCommand, version)`, `usedThisMonth()` = `count(*) FROM ai_requests WHERE created_at >= date_trunc('month', now() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC'`.
