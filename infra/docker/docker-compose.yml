@@ -52,11 +52,14 @@ services:
       APP_BASE_URL: ${APP_BASE_URL:-http://localhost:3000}
       # `make e2e` raises this: its journeys share one client IP behind nginx (default matches application.yml)
       NEXUSOPS_RATELIMITS_RULES_REFRESH_CAPACITY: ${REFRESH_RATE_LIMIT:-30}
+      # the gateway's only outbound call: embeddings and extractive answers, all local (no key, no hosted model)
+      AI_SERVICE_URL: http://ai-service:8000
     ports:
       - "127.0.0.1:${BACKEND_PORT:-8081}:8080"
     depends_on:
       postgres: { condition: service_healthy }
       redis: { condition: service_healthy }
+      ai-service: { condition: service_started }
 
   frontend:
     profiles: [app]
