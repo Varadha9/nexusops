@@ -47,8 +47,11 @@ three features (ticket triage, reply drafts, a policy question assistant).
   `ai-service` image (the model is baked in) and a slow first build.
 - Extractive answers quote the documents: they can't hallucinate, but they are less fluent than an LLM's, can't combine
   facts across passages, and are only as good as the documents. The provider interface is the upgrade path.
-- Postgres needs the `vector` extension; the dev image changed to `pgvector/pgvector:pg17`, and existing volumes need
-  `CREATE EXTENSION IF NOT EXISTS vector` once.
+- Postgres needs the `vector` extension. The dev image has been `pgvector/pgvector:pg17` since the first phase, so only
+  the extension is new: a fresh volume gets it from the new init script `02-extensions.sh`, and existing volumes need
+  `CREATE EXTENSION IF NOT EXISTS vector` once (a one-off command in the README).
+- Documents published before the upgrade are not indexed until an admin clicks **Rebuild index** (Settings → AI); no
+  backfill runs on upgrade.
 - Editing a document makes it briefly unsearchable until its re-embedding completes; the index is rebuildable from the
   source tables at any time.
 - Evaluation harnesses, document file ingestion, streaming, chat history, forecasting and workflow proposals are later

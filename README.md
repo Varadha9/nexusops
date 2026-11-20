@@ -125,9 +125,10 @@ Answers and suggestions drawn only from your workspace's own documents (ADR-0014
 
 - **What it does.** On a ticket, **AI assist** has **Suggest triage** (a category from the workspace's categories, a
   priority and a one-line reason; **Apply** is an ordinary ticket update) and **Draft reply** (a reply built from the
-  knowledge base, placed in the reply box unsent). Under **HRMS → My HR**, **Ask about HR policies** answers a question
-  from the published policies. Every output is labelled "AI-generated — check before use", and answers say
-  "Answered from your workspace's documents" with links to the articles or policies they came from. The AI never
+  knowledge base, placed in the reply box unsent; when no article answers the ticket the card says so and nothing is
+  added to the reply). Under **HRMS → My HR**, **Ask about HR policies** answers a question from the published policies.
+  Every output is labelled "AI-generated — check before use", and answers say "Answered from your workspace's documents"
+  with a numbered list of the articles or policies they came from (an answer's `[1]` is the first source). The AI never
   changes data on its own.
 - **Everything runs locally.** No API key, no hosted model, no paid service and no network at runtime. The `ai-service`
   container holds an open embedding model (`BAAI/bge-small-en-v1.5`, baked into the image at build time, so the first
@@ -149,10 +150,14 @@ Answers and suggestions drawn only from your workspace's own documents (ADR-0014
   same transaction. A workspace can switch AI off (requests then get a clear refusal) and caps its requests per
   calendar month (UTC, default 500); there is also a per-user rate limit. Usage, latency and cited sources are
   recorded and audited for every request; the question and answer text are never stored.
-- **Existing database volumes.** The Postgres image is now `pgvector/pgvector:pg17`. A fresh volume needs nothing; an
-  existing one needs the extension once, before starting the new backend:
+- **Existing database volumes.** The Postgres image (`pgvector/pgvector:pg17`) already ships pgvector; what is new is
+  the `vector` extension in the database. A fresh volume gets it from the new init script
+  (`infra/docker/postgres/init/02-extensions.sh`); an existing one needs it once, before starting the new backend:
   `docker compose -f infra/docker/docker-compose.yml exec postgres psql -U postgres -d nexusops -c 'CREATE EXTENSION IF NOT EXISTS vector'`.
-  If answers seem to miss a document, use **Rebuild index** in Settings → AI.
+- **After upgrading, rebuild the index once.** Articles and policies are indexed when they are published, so documents
+  published before this upgrade are not in the index (AI then answers that it couldn't find anything) until an admin
+  opens Settings → **AI** and clicks **Rebuild index**. Do it once per existing workspace; new workspaces need nothing.
+  **Rebuild index** is also the fix if answers ever seem to miss a document.
 
 ## Try the API (local)
 ```bash
