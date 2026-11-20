@@ -40,6 +40,9 @@ class AnswerIn(CamelModel):
 class AnswerOut(CamelModel):
     answer: str
     cited_passages: list[int]
+    # True only when the answer is made of passage sentences; False for "nothing found" and for
+    # the "no clear answer, these may help" listing (not a reply to put in front of a customer).
+    grounded: bool
     mode: Literal["LOCAL"] = "LOCAL"
     model: str
     prompt_version: Literal["reply-v1", "policy-v1"]

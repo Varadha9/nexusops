@@ -30,6 +30,7 @@ def test_selects_relevant_sentences_with_markers(embedder) -> None:
         "Annual leave days carry over into next year. [7]"
     )
     assert out.cited_passages == [3, 7]
+    assert out.grounded is True
     assert out.prompt_version == "policy-v1"
 
 
@@ -97,6 +98,7 @@ def test_nothing_over_threshold_ranks_by_best_sentence(embedder) -> None:
     assert "- Near [2]" in out.answer
     assert "- Mid [3]" in out.answer
     assert out.cited_passages == [2, 3]
+    assert out.grounded is False
 
 
 def test_ticket_reply_wraps_sentences_without_markers(embedder) -> None:
@@ -108,19 +110,23 @@ def test_ticket_reply_wraps_sentences_without_markers(embedder) -> None:
         "\n\nBest regards"
     )
     assert out.cited_passages == [4]
+    assert out.grounded is True
     assert out.prompt_version == "reply-v1"
 
 
-def test_ticket_reply_without_match_keeps_markers(embedder) -> None:
-    passages = [Passage(n=1, title="Alpha", text="Zebras graze on savannah grass.")]
+def test_ticket_reply_without_match_is_not_a_reply_and_has_no_markers(embedder) -> None:
+    passages = [
+        Passage(n=1, title="Alpha", text="Zebras graze on savannah grass."),
+        Passage(n=2, title="Beta", text="Quarterly budgets close in March."),
+    ]
     out = answer(embedder, "TICKET_REPLY", "quantum chromodynamics", passages)
-    assert out.answer == (
-        "Hi,\n\nThanks for getting in touch. "
-        f"{NO_ANSWER}\n- Alpha [1]\n\n"
-        "If that doesn't solve it, reply to this message and we'll look into it further."
-        "\n\nBest regards"
-    )
-    assert out.cited_passages == [1]
+    # spec D6: no passage markers in the draft text; no greeting around a message that isn't a reply
+    assert out.answer.split("\n")[0] == NO_ANSWER
+    assert "[" not in out.answer
+    assert "Hi," not in out.answer
+    assert "- Alpha" in out.answer and "- Beta" in out.answer
+    assert out.cited_passages == [1, 2]
+    assert out.grounded is False
     assert out.prompt_version == "reply-v1"
 
 
@@ -128,4 +134,5 @@ def test_ticket_reply_with_no_passages(embedder) -> None:
     out = answer(embedder, "TICKET_REPLY", "anything", [])
     assert out.answer == NOTHING
     assert out.cited_passages == []
+    assert out.grounded is False
     assert out.prompt_version == "reply-v1"

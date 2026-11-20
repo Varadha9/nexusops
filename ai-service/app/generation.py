@@ -53,30 +53,30 @@ def answer(
     passages: list[Passage],
 ) -> AnswerOut:
     chosen, best_per_passage = select(embedder, question, passages)
-    cited: list[int]
     if chosen:
         cited = sorted({n for n, _, _ in chosen})
         if task == "TICKET_REPLY":
-            body = " ".join(s for _, _, s in chosen)
+            # spec D6: the draft text carries no passage markers; the citations are still returned
+            body = REPLY_PREFIX + " ".join(s for _, _, s in chosen) + REPLY_SUFFIX
         else:
             body = " ".join(f"{s} [{n}]" for n, _, s in chosen)
-    elif best_per_passage:
+        return _out(body, cited, task, grounded=True)
+    if best_per_passage:
         titles = {p.n: p.title for p in reversed(passages)}
         top = sorted(best_per_passage, key=lambda n: -best_per_passage[n])[:2]
-        cited = sorted(top)
-        listing = "\n".join(f"- {titles[n]} [{n}]" for n in top)
-        body = f"{NO_CLEAR_ANSWER}\n{listing}"
-    else:
-        return _out(NOTHING_FOUND, [], task)
-    if task == "TICKET_REPLY":
-        body = REPLY_PREFIX + body + REPLY_SUFFIX
-    return _out(body, cited, task)
+        # Not a reply: a reply draft gets the bare listing, without the greeting or markers, so the
+        # caller can show it instead of putting it in the reply box.
+        marker = (lambda n: "") if task == "TICKET_REPLY" else (lambda n: f" [{n}]")
+        listing = "\n".join(f"- {titles[n]}{marker(n)}" for n in top)
+        return _out(f"{NO_CLEAR_ANSWER}\n{listing}", sorted(top), task, grounded=False)
+    return _out(NOTHING_FOUND, [], task, grounded=False)
 
 
-def _out(text: str, cited: list[int], task: str) -> AnswerOut:
+def _out(text: str, cited: list[int], task: str, *, grounded: bool) -> AnswerOut:
     return AnswerOut(
         answer=text,
         cited_passages=cited,
+        grounded=grounded,
         model=MODEL_LABEL,
         prompt_version=PROMPT_VERSIONS[task],
     )

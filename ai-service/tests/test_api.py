@@ -54,6 +54,7 @@ def test_answer_end_to_end(client) -> None:
     assert response.json() == {
         "answer": "You get twenty annual leave days. [2]",
         "citedPassages": [2],
+        "grounded": True,
         "mode": "LOCAL",
         "model": "bge-small-en-v1.5",
         "promptVersion": "policy-v1",
