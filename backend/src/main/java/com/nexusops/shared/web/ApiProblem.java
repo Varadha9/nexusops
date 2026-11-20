@@ -80,6 +80,11 @@ public class ApiProblem extends RuntimeException {
         return new ApiProblem(HttpStatus.NOT_FOUND, detail, List.of());
     }
 
+    /** 429 without Retry-After, for quotas that don't refill within seconds (e.g. a monthly limit). */
+    public static ApiProblem tooManyRequests(String detail) {
+        return new ApiProblem(HttpStatus.TOO_MANY_REQUESTS, detail, List.of());
+    }
+
     public static ApiProblem serviceUnavailable(String detail) {
         return new ApiProblem(HttpStatus.SERVICE_UNAVAILABLE, detail, List.of());
     }

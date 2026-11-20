@@ -74,6 +74,11 @@ public final class RateLimitKeys {
         return TenantKeys.key(tenantId, "user", userId.toString(), "rl", "api");
     }
 
+    /** Per-user bucket for an authenticated feature's own rule (e.g. "ai"), tenant-prefixed like {@link #api}. */
+    public static String user(String rule, UUID tenantId, UUID userId) {
+        return TenantKeys.key(tenantId, "user", userId.toString(), "rl", rule);
+    }
+
     private static String normalize(String raw) {
         return raw == null ? "" : raw.strip().toLowerCase(Locale.ROOT);
     }
