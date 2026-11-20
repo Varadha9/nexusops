@@ -77,7 +77,10 @@ class OpenApiContractIT extends IntegrationTestSupport {
                 "\"/api/v1/hr/training-assignments/{id}/complete\"",
                 "\"/api/v1/hr/policies\"", "\"/api/v1/hr/policies/{id}\"", "\"/api/v1/hr/policies/{id}/publish\"",
                 "\"/api/v1/hr/me\"", "\"/api/v1/hr/me/leave-requests\"", "\"/api/v1/hr/me/training/{id}/complete\"",
-                "\"/api/v1/hr/dashboard\"");
+                "\"/api/v1/hr/dashboard\"",
+                "\"/api/v1/ai/status\"", "\"/api/v1/ai/settings\"", "\"/api/v1/ai/index/rebuild\"",
+                "\"/api/v1/ai/helpdesk/tickets/{id}/triage\"", "\"/api/v1/ai/helpdesk/tickets/{id}/reply-draft\"",
+                "\"/api/v1/ai/hr/policy-questions\"");
         // the HelpDesk, HRMS and CRM dashboards keep their own schemas (same Java name, different shape)
         java.util.Map<String, Object> schemas = com.jayway.jsonpath.JsonPath.read(doc, "$.components.schemas");
         assertThat(schemas).containsKeys("LeadStats", "HelpDeskDashboardView", "HrDashboardView");

@@ -11,7 +11,7 @@ import org.testcontainers.utility.DockerImageName;
 import org.testcontainers.utility.MountableFile;
 
 /**
- * Base for integration tests. Starts Postgres (bootstrapped with the SAME role script as local
+ * Base for integration tests. Starts Postgres (bootstrapped with the SAME role and extension scripts as local
  * compose) and Redis once per JVM. The app connects as nexusops_app, never as the superuser,
  * so RLS behaves exactly as in production.
  */
@@ -32,7 +32,10 @@ public abstract class IntegrationTestSupport {
             .withEnv("NEXUSOPS_APP_PASSWORD", APP_PASSWORD)
             .withCopyFileToContainer(
                     MountableFile.forHostPath(Path.of("../infra/docker/postgres/init/01-roles.sh"), 0755),
-                    "/docker-entrypoint-initdb.d/01-roles.sh");
+                    "/docker-entrypoint-initdb.d/01-roles.sh")
+            .withCopyFileToContainer(
+                    MountableFile.forHostPath(Path.of("../infra/docker/postgres/init/02-extensions.sh"), 0755),
+                    "/docker-entrypoint-initdb.d/02-extensions.sh");
 
     @SuppressWarnings("resource")
     public static final GenericContainer<?> REDIS = new GenericContainer<>("redis:7-alpine").withExposedPorts(6379);

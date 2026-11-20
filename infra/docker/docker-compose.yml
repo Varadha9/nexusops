@@ -52,11 +52,14 @@ services:
       APP_BASE_URL: ${APP_BASE_URL:-http://localhost:3000}
       # `make e2e` raises this: its journeys share one client IP behind nginx (default matches application.yml)
       NEXUSOPS_RATELIMITS_RULES_REFRESH_CAPACITY: ${REFRESH_RATE_LIMIT:-30}
+      # the gateway's only outbound call: embeddings and extractive answers, all local (no key, no hosted model)
+      AI_SERVICE_URL: http://ai-service:8000
     ports:
       - "127.0.0.1:${BACKEND_PORT:-8081}:8080"
     depends_on:
       postgres: { condition: service_healthy }
       redis: { condition: service_healthy }
+      ai-service: { condition: service_healthy }
 
   frontend:
     profiles: [app]
@@ -70,6 +73,14 @@ services:
     build: ../../ai-service
     ports:
       - "127.0.0.1:8000:8000"
+    # uvicorn listens only after start-up has loaded and warmed the model, so healthy means ready
+    # (the image has no curl)
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=3)"]
+      interval: 5s
+      timeout: 4s
+      retries: 30
+      start_period: 30s
 
 volumes:
   pgdata:

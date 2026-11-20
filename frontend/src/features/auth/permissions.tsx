@@ -54,6 +54,8 @@ export const PERMISSIONS = {
   hrTraining: 'hr.training.manage',
   hrPolicy: 'hr.policy.manage',
   hrSelf: 'hr.self.service',
+  aiUse: 'ai.assistant.use',
+  aiSettings: 'ai.settings.manage',
 } as const
 
 export type PermissionCode = (typeof PERMISSIONS)[keyof typeof PERMISSIONS]

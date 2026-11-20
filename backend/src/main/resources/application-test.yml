@@ -28,3 +28,4 @@ nexusops:
       platform-login: { capacity: 100000, window: 1m }
       platform-login-account: { capacity: 100000, window: 1m }
       api: { capacity: 100000, window: 1m }
+      ai: { capacity: 100000, window: 1m }

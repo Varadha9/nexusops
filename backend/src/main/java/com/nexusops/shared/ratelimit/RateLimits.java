@@ -91,6 +91,24 @@ public class RateLimits {
         }
     }
 
+    /**
+     * An authenticated feature's per-user rule (e.g. "ai"): 429 with Retry-After when the bucket is empty. Fails OPEN
+     * when Redis is down, like the authenticated API.
+     */
+    public void checkUser(String rule, UUID tenantId, UUID userId) {
+        RateLimitRule limit = rule(rule);
+        RedisRateLimiter.Decision decision;
+        try {
+            decision = limiter.tryConsume(RateLimitKeys.user(rule, tenantId, userId), limit);
+        } catch (RateLimiterUnavailableException e) {
+            log.warn("Rate limiter unavailable; allowing {} request", rule, e);
+            return;
+        }
+        if (!decision.allowed()) {
+            throw new RateLimitExceeded(decision.retryAfterSeconds());
+        }
+    }
+
     private void enforce(String key, RateLimitRule rule) {
         decide(() -> limiter.tryConsume(key, rule));
     }

@@ -15,6 +15,7 @@ import { inventoryChildren } from '@/features/inventory/routes'
 import { ProductDetailPage } from '@/features/products/ProductDetailPage'
 import { ProductsPage } from '@/features/products/ProductsPage'
 import { TasksPage } from '@/features/tasks/TasksPage'
+import { AiSettingsPage } from '@/features/settings/AiSettingsPage'
 import { HelpDeskSettingsPage } from '@/features/settings/HelpDeskSettingsPage'
 import { HrSettingsPage } from '@/features/settings/HrSettingsPage'
 import { ModulesSettingsPage } from '@/features/settings/ModulesSettingsPage'
@@ -100,6 +101,14 @@ export const settingsChildren: RouteObject[] = [
     element: (
       <RequirePermission anyOf={[PERMISSIONS.hrSettings]}>
         <HrSettingsPage />
+      </RequirePermission>
+    ),
+  },
+  {
+    path: 'ai',
+    element: (
+      <RequirePermission anyOf={[PERMISSIONS.aiSettings]}>
+        <AiSettingsPage />
       </RequirePermission>
     ),
   },

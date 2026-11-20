@@ -5,6 +5,7 @@ import { toast } from 'sonner'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { ErrorState, ListSkeleton, PageHeader } from '@/components/states'
+import { TicketAiCard } from '@/features/ai/TicketAiCard'
 import { PERMISSIONS, useCan } from '@/features/auth/permissions'
 import { ActivityPanel } from '@/features/records/ActivityPanel'
 import { DocumentsPanel } from '@/features/records/DocumentsPanel'
@@ -173,6 +174,11 @@ function TicketDetail({ ticketId }: { ticketId: string }) {
     }
   }
 
+  function insertDraft(text: string) {
+    setKind('PUBLIC_REPLY')
+    setDraft((current) => (current.trim() ? `${current.trimEnd()}\n\n${text}` : text))
+  }
+
   const back = (
     <Link to="/app/helpdesk/tickets" className="text-sm underline-offset-4 hover:underline">
       ← Tickets
@@ -245,6 +251,7 @@ function TicketDetail({ ticketId }: { ticketId: string }) {
           </Card>
         </div>
         <div className="space-y-6">
+          {!closed && <TicketAiCard ticket={t} onDraft={canReply ? insertDraft : null} />}
           <SlaCard ticket={t} />
           <TicketContextPanel
             ticket={t}

@@ -1046,3 +1046,54 @@ export interface HrDashboard {
   onboardingInProgress: number
   topSkillGaps: Array<{ skill: SkillRef; employees: number }>
 }
+
+/** Phase 12 — AI platform core. */
+export type AiSourceType = 'KB_ARTICLE' | 'HR_POLICY'
+
+export interface AiCitation {
+  sourceType: AiSourceType
+  sourceId: string
+  title: string
+}
+
+export interface AiStatus {
+  enabled: boolean
+  provider: string
+}
+
+export interface AiTriageSuggestion {
+  categoryId: string | null
+  categoryName: string | null
+  priority: TicketPriority
+  reason: string
+  mode: string
+}
+
+export interface AiReplyDraft {
+  /** A reply when `grounded`; otherwise a message for the agent, never for the customer. */
+  draft: string
+  citations: AiCitation[]
+  /** True only when the draft was built from knowledge-base articles (and cites them). */
+  grounded: boolean
+  mode: string
+}
+
+export interface AiPolicyAnswer {
+  answer: string
+  citations: AiCitation[]
+  mode: string
+}
+
+export interface AiSettingsView {
+  enabled: boolean
+  monthlyLimit: number
+  usedThisMonth: number
+  provider: string
+  indexedChunks: number
+  version: number
+}
+
+export interface AiRebuildResult {
+  indexedSources: number
+  indexedChunks: number
+}
