@@ -1070,8 +1070,11 @@ export interface AiTriageSuggestion {
 }
 
 export interface AiReplyDraft {
+  /** A reply when `grounded`; otherwise a message for the agent, never for the customer. */
   draft: string
   citations: AiCitation[]
+  /** True only when the draft was built from knowledge-base articles (and cites them). */
+  grounded: boolean
   mode: string
 }
 

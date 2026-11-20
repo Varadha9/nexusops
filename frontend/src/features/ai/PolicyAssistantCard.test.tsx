@@ -61,6 +61,30 @@ describe('PolicyAssistantCard', () => {
     )
   })
 
+  it("numbers the sources so the answer's [n] markers point at them", async () => {
+    const { server, user } = setup()
+    server.on('POST /ai/hr/policy-questions', {
+      body: {
+        answer: 'Annual leave is 20 days. [1] Unused days carry over. [2]',
+        citations: [
+          { sourceType: 'HR_POLICY', sourceId: 'pol-1', title: 'Leave policy' },
+          { sourceType: 'HR_POLICY', sourceId: 'pol-2', title: 'Carry-over policy' },
+        ],
+        mode: 'LOCAL',
+      },
+    })
+    const card = await screen.findByRole('region', { name: 'Ask about HR policies' })
+    await user.type(within(card).getByLabelText('Your question'), 'How much leave do I get?')
+    await user.click(within(card).getByRole('button', { name: 'Ask' }))
+    const sources = await within(card).findByRole('list', { name: 'Sources' })
+    expect(sources.tagName).toBe('OL')
+    expect(
+      within(sources)
+        .getAllByRole('listitem')
+        .map((li) => li.textContent),
+    ).toEqual(['Leave policy', 'Carry-over policy'])
+  })
+
   it('shows the server message when the request fails', async () => {
     const { server, user } = setup()
     server.on('POST /ai/hr/policy-questions', {

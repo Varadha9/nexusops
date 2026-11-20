@@ -143,6 +143,7 @@ describe('TicketAiCard', () => {
       body: {
         draft: 'Hello Meera,\nPlease clear the paper tray.',
         citations: [{ sourceType: 'KB_ARTICLE', sourceId: 'a-1', title: 'Clearing paper jams' }],
+        grounded: true,
         mode: 'LOCAL',
       },
     })
@@ -158,6 +159,56 @@ describe('TicketAiCard', () => {
       'href',
       '/app/helpdesk/articles/a-1',
     )
+  })
+
+  it('adds nothing to the reply when no article matches, and says so', async () => {
+    const { server, user } = setup()
+    server.on('POST /ai/helpdesk/tickets/:id/reply-draft', {
+      body: {
+        draft: "I couldn't find anything about that in your workspace's documents.",
+        citations: [],
+        grounded: false,
+        mode: 'LOCAL',
+      },
+    })
+    const card = await screen.findByRole('region', { name: 'AI assist' })
+    await user.selectOptions(screen.getByLabelText('Message type'), 'INTERNAL_NOTE')
+    await user.type(screen.getByLabelText('Message'), 'Checked the logs.')
+    await user.click(within(card).getByRole('button', { name: 'Draft reply' }))
+    expect(
+      await within(card).findByText(
+        'No matching knowledge-base article found — nothing was added to your reply.',
+      ),
+    ).toBeInTheDocument()
+    // the composer keeps what the agent typed, and stays an internal note
+    expect(screen.getByLabelText('Message')).toHaveValue('Checked the logs.')
+    expect(screen.getByLabelText('Message type')).toHaveValue('INTERNAL_NOTE')
+    expect(within(card).queryByText(/in the reply box/)).not.toBeInTheDocument()
+    expect(within(card).queryByText(/couldn't find anything/)).not.toBeInTheDocument()
+  })
+
+  it('shows the articles that may help, without touching the reply, when none answers clearly', async () => {
+    const { server, user } = setup()
+    server.on('POST /ai/helpdesk/tickets/:id/reply-draft', {
+      body: {
+        draft:
+          "I couldn't find a clear answer in your workspace's documents. These may help:\n- Clearing paper jams",
+        citations: [{ sourceType: 'KB_ARTICLE', sourceId: 'a-1', title: 'Clearing paper jams' }],
+        grounded: false,
+        mode: 'LOCAL',
+      },
+    })
+    const card = await screen.findByRole('region', { name: 'AI assist' })
+    await user.click(within(card).getByRole('button', { name: 'Draft reply' }))
+    expect(
+      await within(card).findByText(/No article answers this clearly — nothing was added/),
+    ).toBeInTheDocument()
+    expect(within(card).getByText(/These may help/)).toBeInTheDocument()
+    expect(within(card).getByRole('link', { name: 'Clearing paper jams' })).toHaveAttribute(
+      'href',
+      '/app/helpdesk/articles/a-1',
+    )
+    expect(screen.getByLabelText('Message')).toHaveValue('')
   })
 
   it.each([

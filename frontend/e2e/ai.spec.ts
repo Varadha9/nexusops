@@ -122,9 +122,12 @@ test('AI suggests triage, drafts a reply from the knowledge base and answers a p
   await expect(page.getByText('Triage applied.')).toBeVisible()
   await expect(details).toContainText('CategoryBilling')
 
-  // The reply draft lands in the composer, unsent, from the refund article.
+  // The reply draft lands in the composer, unsent, from the refund article, with no passage markers in it.
   await assist.getByRole('button', { name: 'Draft reply' }).click()
-  await expect(page.getByLabel('Message', { exact: true })).toHaveValue(/refund/i)
+  const composer = page.getByLabel('Message', { exact: true })
+  await expect(composer).toHaveValue(/refund/i)
+  await expect(composer).toHaveValue(/^Hi,/)
+  await expect(composer).not.toHaveValue(/\[\d+\]/)
   await expect(assist.getByRole('list', { name: 'Sources' })).toContainText('Refund requests')
 
   // My HR: a question answered from the policy, quoting it and linking to it.
@@ -135,6 +138,9 @@ test('AI suggests triage, drafts a reply from the knowledge base and answers a p
   await ask.getByRole('button', { name: 'Ask' }).click()
   await expect(ask.getByText("Answered from your workspace's documents")).toBeVisible()
   await expect(ask).toContainText('2 days')
+  // its one source is numbered 1, and so is every marker in the answer
+  await expect(ask).toContainText('[1]')
+  await expect(ask).not.toContainText(/\[[2-9]\]/)
   await expect(
     ask.getByRole('list', { name: 'Sources' }).getByRole('link', { name: 'Remote work' }),
   ).toBeVisible()

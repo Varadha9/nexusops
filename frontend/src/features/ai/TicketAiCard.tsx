@@ -14,6 +14,11 @@ import type { AiReplyDraft, AiTriageSuggestion, TicketView } from '@/lib/api/typ
 import { useAiAvailable } from './api'
 import { AiOutput } from './AiOutput'
 
+/** A reply built from (and citing) knowledge-base articles, as opposed to a "nothing found" message. */
+function isDraft(reply: AiReplyDraft): boolean {
+  return reply.grounded && reply.citations.length > 0
+}
+
 /**
  * D13: the AI only proposes. Triage is applied by an agent through the ordinary ticket update; a draft lands in the
  * composer unsent. `onDraft` is null when the viewer can't reply, which hides Draft reply.
@@ -55,7 +60,8 @@ export function TicketAiCard({
     try {
       const reply = await api.post<AiReplyDraft>(`${path}/reply-draft`)
       setSources(reply)
-      onDraft?.(reply.draft)
+      // only a reply built from articles goes in the composer; a "nothing found" message never does
+      if (isDraft(reply)) onDraft?.(reply.draft)
     } catch (e) {
       setError(problemMessage(e))
     } finally {
@@ -140,10 +146,23 @@ export function TicketAiCard({
             )}
           </div>
         )}
-        {sources && (
+        {sources && isDraft(sources) && (
           <div className="space-y-1">
             <p className="text-muted-foreground">
               The draft is in the reply box below. Edit it before you send.
+            </p>
+            <AiOutput body={sources.draft} citations={sources.citations} grounded />
+          </div>
+        )}
+        {sources && !isDraft(sources) && sources.citations.length === 0 && (
+          <p role="status" className="text-muted-foreground">
+            No matching knowledge-base article found — nothing was added to your reply.
+          </p>
+        )}
+        {sources && !isDraft(sources) && sources.citations.length > 0 && (
+          <div className="space-y-1">
+            <p role="status" className="text-muted-foreground">
+              No article answers this clearly — nothing was added to your reply.
             </p>
             <AiOutput body={sources.draft} citations={sources.citations} grounded />
           </div>

@@ -34,7 +34,8 @@ export function AiOutput({
         <div className="space-y-1 border-t pt-2">
           <p className="text-xs text-muted-foreground">{AI_CAPTION}</p>
           {citations && citations.length > 0 && (
-            <ul aria-label="Sources" className="space-y-0.5">
+            // numbered, so an answer's [1], [2] markers point at the first, second source
+            <ol aria-label="Sources" className="list-decimal space-y-0.5 pl-5">
               {citations.map((c) => (
                 <li key={`${c.sourceType}:${c.sourceId}`}>
                   <Link to={citationPath(c)} className="underline-offset-4 hover:underline">
@@ -42,7 +43,7 @@ export function AiOutput({
                   </Link>
                 </li>
               ))}
-            </ul>
+            </ol>
           )}
         </div>
       )}
