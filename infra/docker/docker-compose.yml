@@ -59,7 +59,7 @@ services:
     depends_on:
       postgres: { condition: service_healthy }
       redis: { condition: service_healthy }
-      ai-service: { condition: service_started }
+      ai-service: { condition: service_healthy }
 
   frontend:
     profiles: [app]
@@ -73,6 +73,14 @@ services:
     build: ../../ai-service
     ports:
       - "127.0.0.1:8000:8000"
+    # uvicorn listens only after start-up has loaded and warmed the model, so healthy means ready
+    # (the image has no curl)
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=3)"]
+      interval: 5s
+      timeout: 4s
+      retries: 30
+      start_period: 30s
 
 volumes:
   pgdata:

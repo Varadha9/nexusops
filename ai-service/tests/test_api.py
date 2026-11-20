@@ -140,3 +140,37 @@ def test_embedder_is_lazy_and_injectable() -> None:
     client = TestClient(create_app(Counting()))
     client.post("/embed", json={"texts": ["a", "b"]})
     assert calls == [2]
+
+
+def test_a_default_app_loads_and_warms_the_model_at_start_up() -> None:
+    calls: list[int] = []
+
+    class Counting(FakeEmbedder):
+        def embed(self, texts):
+            calls.append(len(texts))
+            return super().embed(texts)
+
+    loads: list[Counting] = []
+
+    def load() -> Counting:
+        loads.append(Counting())
+        return loads[-1]
+
+    app = create_app(load_embedder=load)
+    assert loads == []  # importing or creating the app never loads the model
+    with TestClient(app) as client:
+        # start-up loaded it and ran one warm-up embed, before any request
+        assert len(loads) == 1
+        assert calls == [1]
+        assert client.get("/health").status_code == 200
+        client.post("/embed", json={"texts": ["a", "b"]})
+    assert len(loads) == 1
+    assert calls == [1, 2]
+
+
+def test_an_injected_embedder_is_not_replaced_at_start_up() -> None:
+    def load() -> FakeEmbedder:
+        raise AssertionError("must not load the real model")
+
+    with TestClient(create_app(FakeEmbedder(), load_embedder=load)) as client:
+        assert client.post("/embed", json={"texts": ["a"]}).status_code == 200
