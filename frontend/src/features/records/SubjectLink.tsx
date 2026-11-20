@@ -11,6 +11,7 @@ export function subjectPath(type: string, id: string): string | null {
   if (type === 'SALES_ORDER') return `/app/inventory/sales-orders/${id}`
   if (type === 'TICKET') return `/app/helpdesk/tickets/${id}`
   if (type === 'KB_ARTICLE') return `/app/helpdesk/articles/${id}`
+  if (type === 'EMPLOYEE') return `/app/hrms/employees/${id}`
   return null
 }
 

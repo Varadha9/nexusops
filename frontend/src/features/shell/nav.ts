@@ -20,7 +20,7 @@ export const MODULE_PHASES: Record<string, { label: string; phase: number; descr
       description: 'Warehouses, stock, purchase and sales orders.',
     },
     HELPDESK: { label: 'HelpDesk', phase: 7, description: 'Tickets, SLAs and customer support.' },
-    HRMS: { label: 'HRMS', phase: 8, description: 'Employees, onboarding and leave.' },
+    HRMS: { label: 'HRMS', phase: 8, description: 'Employees, leave, onboarding and training.' },
   }
 
 export const NAV_ITEMS: NavItem[] = [
@@ -46,6 +46,8 @@ export const SETTINGS_TABS: Array<{ to: string; label: string; anyOf: Permission
   { to: '/app/settings/pipeline', label: 'Pipeline', anyOf: [PERMISSIONS.pipelineManage] },
   { to: '/app/settings/warehouses', label: 'Warehouses', anyOf: [PERMISSIONS.warehouseManage] },
   { to: '/app/settings/helpdesk', label: 'HelpDesk', anyOf: [PERMISSIONS.helpdeskSettings] },
+  { to: '/app/settings/hrms', label: 'HRMS', anyOf: [PERMISSIONS.hrSettings] },
+  { to: '/app/settings/ai', label: 'AI', anyOf: [PERMISSIONS.aiSettings] },
 ]
 
 export function firstSettingsPath(can: (...codes: PermissionCode[]) => boolean): string | null {

@@ -10,6 +10,7 @@ import com.nexusops.identity.Members;
 import com.nexusops.shared.Ids;
 import com.nexusops.shared.TenantContext;
 import com.nexusops.shared.Text;
+import com.nexusops.shared.knowledge.KnowledgeChanged;
 import com.nexusops.shared.security.CurrentAuthorities;
 import com.nexusops.shared.web.ApiProblem;
 import com.nexusops.shared.web.PageResponse;
@@ -22,6 +23,7 @@ import java.util.Objects;
 import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -39,14 +41,16 @@ public class ArticleService {
     private final CategoryService categories;
     private final Members members;
     private final AuditService audit;
+    private final ApplicationEventPublisher events;
 
     ArticleService(KbArticleRepository articles, HelpDeskSearch search, CategoryService categories, Members members,
-            AuditService audit) {
+            AuditService audit, ApplicationEventPublisher events) {
         this.articles = articles;
         this.search = search;
         this.categories = categories;
         this.members = members;
         this.audit = audit;
+        this.events = events;
     }
 
     @Transactional(readOnly = true)
@@ -94,6 +98,7 @@ public class ArticleService {
         article.apply(f.title(), f.body(), f.categoryId());
         articles.flush();
         audit.record(AuditEntry.of("ArticleUpdated", "KbArticle", id).withBefore(before).withAfter(snapshot(article)));
+        knowledgeChanged(id);
         return view(article);
     }
 
@@ -107,6 +112,7 @@ public class ArticleService {
             articles.flush();
             audit.record(AuditEntry.of("ArticlePublished", "KbArticle", id).withAfter(Map.of("title", article.getTitle())));
         }
+        knowledgeChanged(id);
         return view(article);
     }
 
@@ -120,6 +126,7 @@ public class ArticleService {
             articles.flush();
             audit.record(AuditEntry.of("ArticleUnpublished", "KbArticle", id).withAfter(Map.of("title", article.getTitle())));
         }
+        knowledgeChanged(id);
         return view(article);
     }
 
@@ -128,11 +135,18 @@ public class ArticleService {
         KbArticle article = find(id);
         checkVersion(article, version);
         if (article.getStatus() != ArticleStatus.ARCHIVED) {
+            Map<String, Object> before = snapshot(article);
             article.archive(Instant.now());
             articles.flush();
-            audit.record(AuditEntry.of("ArticleArchived", "KbArticle", id).withBefore(snapshot(article)));
+            audit.record(AuditEntry.of("ArticleArchived", "KbArticle", id).withBefore(before).withAfter(snapshot(article)));
         }
+        knowledgeChanged(id);
         return view(article);
+    }
+
+    /** The AI index drops this document's chunks in this transaction and re-embeds it after commit (D3). */
+    private void knowledgeChanged(UUID id) {
+        events.publishEvent(new KnowledgeChanged(ArticleKnowledge.SOURCE_TYPE, id));
     }
 
     /** Summaries in the order of {@code ids} (search ranking). */

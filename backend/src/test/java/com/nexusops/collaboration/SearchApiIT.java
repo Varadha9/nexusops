@@ -8,6 +8,7 @@ import com.nexusops.support.IntegrationTestSupport;
 import com.nexusops.support.RecordingMailSender;
 import com.nexusops.support.TestCrm;
 import com.nexusops.support.TestHelpDesk;
+import com.nexusops.support.TestHr;
 import com.nexusops.support.TestInventory;
 import com.nexusops.support.TestMembers;
 import com.nexusops.support.TestRoles;
@@ -140,5 +141,15 @@ class SearchApiIT extends IntegrationTestSupport {
         owner.post("/api/v1/helpdesk/articles/" + article + "/publish", "{\"version\":0}").andExpect(status().isOk());
         owner.get("/api/v1/search?q=zephyr").andExpect(jsonPath("$[*].type")
                 .value(Matchers.contains("TICKET", "KB_ARTICLE")));
+    }
+
+    @Test
+    void findsEmployeesByNameOrNumber() throws Exception {
+        TestHr.enable(owner);
+        TestHr.hire(owner, "Zephyra", "Nair", "ZN-42");
+        owner.get("/api/v1/search?q=zephyra").andExpect(jsonPath("$[*].type").value(Matchers.hasItem("EMPLOYEE")))
+                .andExpect(jsonPath("$[?(@.type == 'EMPLOYEE')].label").value(Matchers.contains("Zephyra Nair · ZN-42")));
+        owner.get("/api/v1/search?q=zn-42").andExpect(jsonPath("$[?(@.type == 'EMPLOYEE')].label")
+                .value(Matchers.contains("Zephyra Nair · ZN-42")));
     }
 }

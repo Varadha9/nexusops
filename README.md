@@ -9,6 +9,8 @@ one permission model, one operational event stream — with modular business cap
 - CRM (Phase 5): `docs/superpowers/specs/2026-10-07-crm-mvp-design.md`
 - Inventory (Phase 6): `docs/superpowers/specs/2026-10-08-inventory-mvp-design.md`
 - HelpDesk (Phase 7): `docs/superpowers/specs/2026-10-09-helpdesk-mvp-design.md`
+- HRMS (Phase 8): `docs/superpowers/specs/2026-10-09-hrms-mvp-design.md`
+- AI platform core (Phase 12, part 1): `docs/superpowers/specs/2026-11-20-ai-platform-core-design.md`
 - Decisions: `docs/decisions/`
 - Implementation plans: `docs/superpowers/plans/`
 
@@ -96,6 +98,67 @@ Switch the module on under **Settings → Modules**. Every HelpDesk permission s
   days the first-response and resolution times, the SLA met rates and the reopen rate.
 - Party, Customer 360 and product pages show their tickets. Tickets have tasks, files and activity like any record.
 
+## HRMS (Phase 8)
+Switch the module on under **Settings → Modules**; every HRMS permission switches off with it (ADR-0011, ADR-0013).
+
+- **Employees** are directory persons with an employment record: number, department, job role, manager, type, start
+  and end dates, and optionally the team member account they sign in with. Hiring can create the person in the
+  directory; the directory's employee role follows the record and can't be edited by hand while HRMS manages it.
+  Ending employment cancels leave and training after the last day; it can be undone.
+- **Job roles** list the skills they need (levels 1–5). Every employee page shows their **skill gaps** and recommends
+  courses that teach enough; completing a course raises the skill.
+- **Onboarding** templates (a "Standard onboarding" is ready) turn into tasks for HR, the manager and the new hire.
+  For new hires to tick off their own items, their role needs task read (`collaboration.task.read`) as well as
+  `hr.self.service`; otherwise their manager or HR ticks them off.
+- **Leave** is counted in working days (weekends and the workspace's public holidays don't count) against yearly
+  balances; HR can adjust a balance. Employees ask for leave under **My HR**; their manager is emailed, approvers decide
+  under **HRMS → Leave**, and the employee is emailed. Nobody decides their own request.
+- **Training** assigns courses with optional due dates; overdue ones are flagged.
+- **Policies** are a searchable library; published ones are readable by everyone with self-service.
+- **Overview**: headcount by department, joiners and leavers, who's away, pending approvals, overdue training,
+  onboarding in progress and the most common skill gaps.
+- Settings → HRMS holds departments, job roles, skills, leave types, public holidays and onboarding templates.
+
+## AI assistance (Phase 12, part 1)
+Answers and suggestions drawn only from your workspace's own documents (ADR-0014; spec
+`docs/superpowers/specs/2026-11-20-ai-platform-core-design.md`).
+
+- **What it does.** On a ticket, **AI assist** has **Suggest triage** (a category from the workspace's categories, a
+  priority and a one-line reason; **Apply** is an ordinary ticket update) and **Draft reply** (a reply built from the
+  knowledge base, placed in the reply box unsent; when no article answers the ticket the card says so and nothing is
+  added to the reply). Under **HRMS → My HR**, **Ask about HR policies** answers a question from the published policies.
+  Every output is labelled "AI-generated — check before use", and answers say "Answered from your workspace's documents"
+  with a numbered list of the articles or policies they came from (an answer's `[1]` is the first source). The AI never
+  changes data on its own.
+- **Everything runs locally.** No API key, no hosted model, no paid service and no network at runtime. The `ai-service`
+  container holds an open embedding model (`BAAI/bge-small-en-v1.5`, baked into the image at build time, so the first
+  `docker compose ... --build` takes a few minutes). Generation is *extractive*: the answer is made of sentences quoted
+  from the retrieved passages. It is less fluent than a language model and it can't invent anything, which is the point
+  of the first slice. A hosted or local LLM can be plugged in later behind the same provider interface without
+  changing the gateway or the UI.
+- **How an answer is assembled and cited.** The backend (the *gateway*) is the only thing that touches the database.
+  Published articles and policies are split into passages (about 800 characters) and embedded into a pgvector index.
+  For a question the gateway embeds it, takes the five nearest passages **the caller is allowed to read**, and sends
+  only that text to `ai-service`. `ai-service` embeds each sentence, keeps those closest to the question (at most four,
+  at most two per passage) and returns them with passage markers. The gateway maps the markers back to sources inside
+  the retrieved set, so a citation can only name a document that was actually used. If nothing is close enough it says
+  so instead of guessing.
+- **Permissions and opt-out.** Using AI needs `ai.assistant.use`; turning it off or on, setting the limit and
+  rebuilding the index need `ai.settings.manage` (Settings → **AI**). Retrieval is filtered by tenant (row-level
+  security) and by permission: knowledge-base passages need `helpdesk.article.read`, policy passages need
+  `hr.self.service` (or `hr.policy.manage`). Unpublishing, archiving or editing a source removes its passages in the
+  same transaction. A workspace can switch AI off (requests then get a clear refusal) and caps its requests per
+  calendar month (UTC, default 500); there is also a per-user rate limit. Usage, latency and cited sources are
+  recorded and audited for every request; the question and answer text are never stored.
+- **Existing database volumes.** The Postgres image (`pgvector/pgvector:pg17`) already ships pgvector; what is new is
+  the `vector` extension in the database. A fresh volume gets it from the new init script
+  (`infra/docker/postgres/init/02-extensions.sh`); an existing one needs it once, before starting the new backend:
+  `docker compose -f infra/docker/docker-compose.yml exec postgres psql -U postgres -d nexusops -c 'CREATE EXTENSION IF NOT EXISTS vector'`.
+- **After upgrading, rebuild the index once.** Articles and policies are indexed when they are published, so documents
+  published before this upgrade are not in the index (AI then answers that it couldn't find anything) until an admin
+  opens Settings → **AI** and clicks **Rebuild index**. Do it once per existing workspace; new workspaces need nothing.
+  **Rebuild index** is also the fix if answers ever seem to miss a document.
+
 ## Try the API (local)
 ```bash
 curl -s -X POST localhost:8081/api/v1/auth/signup -H 'Content-Type: application/json' \
@@ -167,7 +230,9 @@ database backups. Losing it means every operator must re-enrol.
 - `make e2e` starts the full Docker stack (UI http://localhost:3000, Mailpit http://localhost:8025) and runs the
   Playwright journeys: sign up → verify → sign in → custom role → invite → accept → assign → audit trail, a
   platform admin suspending and reactivating a workspace, a lead becoming a customer with a won deal, and stock
-  counted, sold, explained by a reorder suggestion and received in two parts. The stack stays up afterwards;
+  counted, sold, explained by a reorder suggestion and received in two parts, and an AI journey (`ai.spec.ts`: triage
+  applied, a reply drafted from the knowledge base and a policy question answered with its source, all by the real
+  `ai-service`). The stack stays up afterwards;
   `make down` stops it.
 - `make e2e` seeds a local-only platform operator (`e2e-ops@nexusops.test`); `make reset-db` removes it, and the next
   `make e2e` seeds it again.

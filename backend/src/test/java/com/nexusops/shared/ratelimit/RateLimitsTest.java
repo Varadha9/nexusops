@@ -18,7 +18,7 @@ class RateLimitsTest {
     final RedisRateLimiter limiter = mock(RedisRateLimiter.class);
     final RateLimitRule rule = new RateLimitRule(10, Duration.ofMinutes(1));
     final RateLimits limits = new RateLimits(limiter,
-            new RateLimitProperties(Map.of("login", rule, "login-account", rule, "login-workspace", rule, "api", rule, "signup", rule)));
+            new RateLimitProperties(Map.of("login", rule, "login-account", rule, "login-workspace", rule, "api", rule, "signup", rule, "ai", rule)));
 
     @Test
     void exceededPublicLimitIs429WithRetryAfter() {
@@ -42,6 +42,26 @@ class RateLimitsTest {
     void apiFailsOpenWhenRedisIsDown() {
         when(limiter.tryConsume(anyString(), any())).thenThrow(new RateLimiterUnavailableException(new RuntimeException()));
         assertThat(limits.apiRetryAfter(UUID.randomUUID(), UUID.randomUUID())).isEmpty();
+    }
+
+    @Test
+    void userRuleChargesTheTenantPrefixedUserBucketAndIs429WhenEmpty() {
+        UUID tenant = UUID.randomUUID();
+        UUID user = UUID.randomUUID();
+        when(limiter.tryConsume(anyString(), any())).thenReturn(new RedisRateLimiter.Decision(true, 0));
+        limits.checkUser("ai", tenant, user);
+        org.mockito.Mockito.verify(limiter).tryConsume(
+                org.mockito.ArgumentMatchers.eq("tenant:" + tenant + ":user:" + user + ":rl:ai"),
+                org.mockito.ArgumentMatchers.eq(rule));
+        when(limiter.tryConsume(anyString(), any())).thenReturn(new RedisRateLimiter.Decision(false, 9));
+        assertThatThrownBy(() -> limits.checkUser("ai", tenant, user))
+                .isInstanceOfSatisfying(RateLimitExceeded.class, e -> assertThat(e.retryAfterSeconds()).isEqualTo(9));
+    }
+
+    @Test
+    void userRuleFailsOpenWhenRedisIsDown() {
+        when(limiter.tryConsume(anyString(), any())).thenThrow(new RateLimiterUnavailableException(new RuntimeException()));
+        limits.checkUser("ai", UUID.randomUUID(), UUID.randomUUID()); // no exception
     }
 
     @Test

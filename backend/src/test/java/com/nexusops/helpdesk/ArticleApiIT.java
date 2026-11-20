@@ -76,6 +76,9 @@ class ArticleApiIT extends IntegrationTestSupport {
         assertThat(audits("ArticleUpdated")).isEqualTo(1);
         assertThat(audits("ArticleUnpublished")).isEqualTo(1);
         assertThat(audits("ArticleArchived")).isEqualTo(1);
+        assertThat(OwnerJdbc.ownerAs(ws.tenantId()).queryForList("select before ->> 'status' as before, "
+                + "after ->> 'status' as after from audit_events where action = 'ArticleArchived'"))
+                .containsExactly(java.util.Map.of("before", "DRAFT", "after", "ARCHIVED"));
     }
 
     @Test

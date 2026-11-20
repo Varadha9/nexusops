@@ -16,6 +16,7 @@ const TYPE_LABELS: Record<string, string> = {
   SALES_ORDER: 'Sales order',
   TICKET: 'Ticket',
   KB_ARTICLE: 'Article',
+  EMPLOYEE: 'Employee',
 }
 
 /** Workspace search (D12): 2+ characters, debounced; results are only the record types you may read. */
